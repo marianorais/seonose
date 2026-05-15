@@ -17,9 +17,12 @@ const Header = ({ onOpenSidebar, onOpenSettings, onOpenStats }: HeaderProps) => 
           ☰
         </button>
 
-        <div className="flex flex-1 flex-col items-center text-center">
-          <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Juego diario</p>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">SEONOSE</h1>
+        <div className="flex flex-1 items-center justify-center text-center">
+          <img
+            src={new URL('../assets/logo.jpg', import.meta.url).href}
+            alt="Logo de la aplicación"
+            className="h-12 w-auto object-contain"
+          />
         </div>
 
         <div className="flex items-center gap-3">

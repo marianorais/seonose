@@ -1,10 +1,15 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace backend.Models
 {
-    public sealed record QuestionItem
+    public class QuestionItem
     {
-        public required int Id { get; init; }
-        public required string Question { get; init; }
-        public required string Answer { get; init; }
-        public IEnumerable<string>? Choices { get; init; }
+        [Key]
+        public int Id { get; set; }
+        [Required]
+        public string Question { get; set; } = string.Empty;
+        [Required]
+        public string Answer { get; set; } = string.Empty;
+        public string[]? Choices { get; set; }
     }
 }

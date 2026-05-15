@@ -7,10 +7,21 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Node
 node_modules
 dist
 dist-ssr
 *.local
+
+# .NET build folders
+bin/
+obj/
+
+# Base de datos local
+*.db
+
+# Temporales
+temp-backend-build/
 
 # Editor directories and files
 .vscode/*

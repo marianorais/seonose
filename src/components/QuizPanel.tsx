@@ -155,7 +155,7 @@ const QuizPanel = ({ questions, settings, questionDate }: QuizPanelProps) => {
   const [tempAnswer, setTempAnswer] = useState<string>(savedState?.answer ?? '')
   const [isTimeout, setIsTimeout] = useState<boolean>(savedState?.isTimeout ?? false)
   const finishRecordedRef = useRef<boolean>(savedState?.finished ?? false)
-  const initialLoadRef = useRef(true)
+  // const initialLoadRef = useRef(true)
   // 🔧 CAMBIO 1: Añadido para rastrear cambios de día
   const previousQuestionDateRef = useRef<string | null>(null)
 

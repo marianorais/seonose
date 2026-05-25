@@ -14,19 +14,45 @@ const FALLBACK_SETTINGS: QuestionSettings = {
 }
 
 const FALLBACK_QUESTIONS: QuestionItem[] = [
-  { id: 1, question: '¿Cuál es la moneda oficial de Japón?', answer: 'Yen', choices: ['Dólar', 'Yen', 'Euro'] },
-  { id: 2, question: '¿Quién escribió "Cien años de soledad"?', answer: 'Gabriel García Márquez', choices: ['Juan Rulfo', 'Gabriel García Márquez', 'Mario Vargas Llosa'] },
-  { id: 3, question: '¿Qué elemento tiene el número atómico 6?', answer: 'Carbono', choices: ['Oxígeno', 'Carbono', 'Hidrógeno'] },
-  { id: 4, question: '¿En qué año llegó el hombre a la Luna?', answer: '1969', choices: ['1969', '1972', '1959'] },
-  { id: 5, question: '¿Qué país tiene 11 idiomas oficiales?', answer: 'Sudáfrica', choices: ['India', 'Sudáfrica', 'Canadá'] },
-  { id: 6, question: '¿Cuál es el cuarto planeta desde el Sol?', answer: 'Marte', choices: ['Venus', 'Marte', 'Júpiter'] },
-  { id: 7, question: '¿Cuál es el idioma oficial de Brasil?', answer: 'Portugués', choices: ['Español', 'Portugués', 'Inglés'] },
-  { id: 8, question: '¿Qué océano es el más grande del planeta?', answer: 'Pacífico', choices: ['Atlántico', 'Índico', 'Pacífico'] },
-  { id: 9, question: '¿Quién escribió "El Principito"?', answer: 'Antoine de Saint-Exupéry', choices: ['Victor Hugo', 'Antoine de Saint-Exupéry', 'Émile Zola'] },
-  { id: 10, question: '¿Cuál es la capital de Australia?', answer: 'Canberra', choices: ['Sidney', 'Melbourne', 'Canberra'] },
+  { id: 1, question: '¿Cuál es la capital de Nigeria?', answer: 'Abuya', choices: ['Lagos', 'Abuya', 'Kano'] },
+  { id: 2, question: '¿En qué año terminó la Segunda Guerra Mundial?', answer: '1945', choices: ['1945', '1939', '1950'] },
+  { id: 3, question: '¿Cuál es el metal más abundante en la corteza terrestre?', answer: 'Aluminio', choices: ['Hierro', 'Cobre', 'Aluminio'] },
+  { id: 4, question: '¿Qué océano es el más pequeño?', answer: 'Ártico', choices: ['Pacífico', 'Atlántico', 'Ártico'] },
+  { id: 5, question: '¿Qué vitamina se obtiene principalmente del sol?', answer: 'Vitamina D', choices: ['Vitamina C', 'Vitamina B12', 'Vitamina D'] },
+  { id: 6, question: '¿Qué científico formuló la teoría de la relatividad general?', answer: 'Albert Einstein', choices: ['Isaac Newton', 'Nikola Tesla', 'Albert Einstein'] },
+  { id: 7, question: '¿Cuál es el elemento químico con símbolo W?', answer: 'Wolframio', choices: ['Titanio', 'Wolframio', 'Platino'] },
+  { id: 8, question: '¿En qué año cayó el Imperio Romano de Occidente?', answer: '476', choices: ['410', '1453', '476'] },
+  { id: 9, question: '¿Qué país ganó el Mundial de fútbol de 2010?', answer: 'España', choices: ['Alemania', 'Argentina', 'España'] },
+  { id: 10, question: '¿Qué matemático desarrolló el cálculo diferencial junto con Leibniz?', answer: 'Isaac Newton', choices: ['Pitágoras', 'Isaac Newton', 'Euler'] },
+  { id: 11, question: '¿Qué lenguaje se utiliza principalmente para desarrollar Android nativo?', answer: 'Kotlin', choices: ['Swift', 'JavaScript', 'Kotlin'] },
+  { id: 12, question: '¿Cuál es el hueso más largo del cuerpo humano?', answer: 'Fémur', choices: ['Tibia', 'Húmero', 'Fémur'] },
+  { id: 13, question: '¿Qué civilización construyó Machu Picchu?', answer: 'Inca', choices: ['Maya', 'Azteca', 'Inca'] },
+  { id: 14, question: '¿Cuál es la velocidad aproximada de la luz?', answer: '300000 km/s', choices: ['150000 km/s', '300000 km/s', '100000 km/s'] },
+  { id: 15, question: '¿Qué planeta tiene más lunas conocidas?', answer: 'Saturno', choices: ['Júpiter', 'Marte', 'Saturno'] },
+  { id: 16, question: '¿Quién escribió "Cien años de soledad"?', answer: 'Gabriel García Márquez', choices: ['Mario Vargas Llosa', 'Pablo Neruda', 'Gabriel García Márquez'] },
+  { id: 17, question: '¿Qué estructura celular contiene el ADN?', answer: 'Núcleo', choices: ['Mitocondria', 'Núcleo', 'Ribosoma'] },
+  { id: 18, question: '¿Cuál es el país más grande del mundo?', answer: 'Rusia', choices: ['Canadá', 'China', 'Rusia'] },
+  { id: 19, question: '¿Qué filósofo dijo "Pienso, luego existo"?', answer: 'René Descartes', choices: ['Platón', 'Aristóteles', 'René Descartes'] },
+  { id: 20, question: '¿Qué país tiene más husos horarios?', answer: 'Francia', choices: ['Rusia', 'Estados Unidos', 'Francia'] },
+  { id: 21, question: '¿Cuál es la moneda oficial de Suiza?', answer: 'Franco suizo', choices: ['Euro', 'Corona', 'Franco suizo'] },
+  { id: 22, question: '¿Qué científico descubrió la penicilina?', answer: 'Alexander Fleming', choices: ['Louis Pasteur', 'Alexander Fleming', 'Darwin'] },
+  { id: 23, question: '¿Cuál es el país con mayor cantidad de volcanes activos?', answer: 'Indonesia', choices: ['Japón', 'Chile', 'Indonesia'] },
+  { id: 24, question: '¿Qué físico propuso las leyes del movimiento?', answer: 'Isaac Newton', choices: ['Albert Einstein', 'Isaac Newton', 'Stephen Hawking'] },
+  { id: 25, question: '¿Cuál es el órgano más grande del cuerpo humano?', answer: 'La piel', choices: ['El hígado', 'El corazón', 'La piel'] },
+  { id: 26, question: '¿Cuál es la capital de Kazajistán?', answer: 'Astaná', choices: ['Taskent', 'Bakú', 'Astaná'] },
+  { id: 27, question: '¿Qué planeta tarda más tiempo en dar una vuelta al Sol?', answer: 'Neptuno', choices: ['Saturno', 'Urano', 'Neptuno'] },
+  { id: 28, question: '¿Cuál es el idioma más hablado del mundo por hablantes nativos?', answer: 'Chino mandarín', choices: ['Inglés', 'Español', 'Chino mandarín'] },
+  { id: 29, question: '¿Qué científico desarrolló la teoría de la evolución?', answer: 'Charles Darwin', choices: ['Gregor Mendel', 'Charles Darwin', 'Louis Pasteur'] },
+  { id: 30, question: '¿Qué país tiene la ciudad más poblada del mundo?', answer: 'Japón', choices: ['China', 'India', 'Japón'] },
+  { id: 31, question: '¿Cuál es el único mamífero capaz de volar?', answer: 'Murciélago', choices: ['Ardilla voladora', 'Murciélago', 'Cóndor'] },
+  { id: 32, question: '¿Qué país inventó el papel?', answer: 'China', choices: ['Egipto', 'Grecia', 'China'] },
+  { id: 33, question: '¿Cuál es el océano más profundo del planeta?', answer: 'Pacífico', choices: ['Atlántico', 'Índico', 'Pacífico'] },
+  { id: 34, question: '¿Qué elemento químico tiene el número atómico 79?', answer: 'Oro', choices: ['Plata', 'Cobre', 'Oro'] },
+  { id: 35, question: '¿Qué país tiene forma de bota?', answer: 'Italia', choices: ['Grecia', 'Portugal', 'Italia'] },
 ]
 
 const QUESTIONS_PER_GAME = 5
+const use_database = false
 
 const normalizeString = (value: string) =>
   value
@@ -144,26 +170,37 @@ function App() {
 
     const loadData = async () => {
       try {
-        const [settingsResponse, questionsResponse] = await Promise.all([
-          fetch(`${baseUrl}/api/questions/settings`),
-          fetch(`${baseUrl}/api/questions`),
-        ])
+        if(use_database){
+          const [settingsResponse, questionsResponse] = await Promise.all([
+            fetch(`${baseUrl}/api/questions/settings`),
+            fetch(`${baseUrl}/api/questions`),
+          ])
 
-        if (!settingsResponse.ok || !questionsResponse.ok) {
-          throw new Error(
-            `Error al cargar la API de backend: settings ${settingsResponse.status} questions ${questionsResponse.status}`
-          )
+          if (!settingsResponse.ok || !questionsResponse.ok) {
+            throw new Error(
+              `Error al cargar la API de backend: settings ${settingsResponse.status} questions ${questionsResponse.status}`
+            )
+          }
+
+          const settingsData = (await settingsResponse.json()) as QuestionSettings
+          const questionsData = (await questionsResponse.json()) as QuestionItem[]
+
+          const todayKey = getTodayKey()
+          setSettings(settingsData)
+          setAllQuestions(questionsData)
+          setQuestionDate(todayKey)
+          setQuestions(selectDailyQuestions(questionsData, todayKey, settingsData.questionsPerDay))
         }
-
-        const settingsData = (await settingsResponse.json()) as QuestionSettings
-        const questionsData = (await questionsResponse.json()) as QuestionItem[]
-
-        const todayKey = getTodayKey()
-        setSettings(settingsData)
-        setAllQuestions(questionsData)
-        setQuestionDate(todayKey)
-        setQuestions(selectDailyQuestions(questionsData, todayKey, settingsData.questionsPerDay))
-      } catch (exception) {
+        else{
+          console.log('No se pudo conectar al backend. Usando datos locales de demo.')
+          const todayKey = getTodayKey()
+          setSettings(FALLBACK_SETTINGS)
+          setAllQuestions(FALLBACK_QUESTIONS)
+          setQuestionDate(todayKey)
+          setQuestions(selectDailyQuestions(FALLBACK_QUESTIONS, todayKey, FALLBACK_SETTINGS.questionsPerDay))
+        }
+      } 
+      catch (exception) {
         console.error(exception)
         console.log('No se pudo conectar al backend. Usando datos locales de demo.')
         const todayKey = getTodayKey()

@@ -3,6 +3,9 @@ export interface QuestionItem {
   question: string
   answer: string
   choices?: string[]
+  availablefrom?: string
+  enabled?: boolean
+
 }
 
 export interface QuestionSettings {

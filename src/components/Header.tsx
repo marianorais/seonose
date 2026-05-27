@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 interface HeaderProps {
   onOpenSidebar: () => void
   onOpenSettings: () => void
@@ -18,11 +20,13 @@ const Header = ({ onOpenSidebar, onOpenSettings, onOpenStats }: HeaderProps) => 
         </button>
 
         <div className="flex flex-1 items-center justify-center text-center">
-          <img
-            src={new URL('../assets/logo.jpg', import.meta.url).href}
-            alt="Logo de la aplicación"
-            className="h-12 w-auto object-contain"
-          />
+          <Link to="/">
+            <img
+              src={new URL('../assets/logo.jpg', import.meta.url).href}
+              alt="Logo de la aplicación"
+              className="h-12 w-auto cursor-pointer object-contain transition hover:opacity-90"
+            />
+          </Link>
         </div>
 
         <div className="flex items-center gap-3">

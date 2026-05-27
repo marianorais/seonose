@@ -26,8 +26,8 @@ const GAME_START_DATE = '2026-05-01'
 const STORAGE_KEY = 'seonose-quiz-state'
 const RESULTS_HISTORY_KEY = 'seonose-results-history'
 
-const normalize = (value: string) =>
-  value
+const normalize = (value?: string) =>
+  (value ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -801,7 +801,7 @@ const QuizPanel = ({
         </span>
 
         <span className="rounded-[1.5rem] bg-white px-4 py-3 text-3xl font-bold text-slate-900 shadow-sm">
-          {secondsLeft}s
+          {secondsLeft}
         </span>
       </div>
 

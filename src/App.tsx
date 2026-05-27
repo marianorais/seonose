@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar'
 import SettingsModal from './components/SettingsModal'
 import StatsModal from './components/StatsModal'
 import type { QuestionItem, QuestionSettings } from './types'
+import { supabase } from './lib/supabase'
 
 type VisualTheme = 'light' | 'dark' | 'black' | 'blue' | 'sepia'
 
@@ -12,6 +13,12 @@ const FALLBACK_SETTINGS: QuestionSettings = {
   questionsPerDay: 5,
   secondsPerQuestion: 30,
 }
+
+// LocalStorage donde se guardan las configuraciones personalizadas
+const SETTINGS_STORAGE_KEY_QUESTIONS = 'seonose-custom-settings-questions'
+
+// Flag temporal para usar o no backend
+const use_database = true
 
 const FALLBACK_QUESTIONS: QuestionItem[] = [
   { id: 1, question: '¿Cuál es la capital de Nigeria?', answer: 'Abuya', choices: ['Lagos', 'Abuya', 'Kano'] },
@@ -51,18 +58,17 @@ const FALLBACK_QUESTIONS: QuestionItem[] = [
   { id: 35, question: '¿Qué país tiene forma de bota?', answer: 'Italia', choices: ['Grecia', 'Portugal', 'Italia'] },
 ]
 
-const QUESTIONS_PER_GAME = 5
-const use_database = false
+// const QUESTIONS_PER_GAME = 5
 
-const normalizeString = (value: string) =>
-  value
+const normalizeString = (value?: string) =>
+  (value ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
-
 const ensureThreeChoices = (question: QuestionItem) => {
-  const answer = question.answer.trim()
+  const answer = (question.answer ?? '').trim()
+
   const sourceChoices = Array.from(
     new Set(
       (question.choices ?? [])
@@ -75,7 +81,10 @@ const ensureThreeChoices = (question: QuestionItem) => {
     sourceChoices.unshift(answer)
   }
 
-  const otherChoices = sourceChoices.filter((choice) => normalizeString(choice) !== normalizeString(answer)).slice(0, 2)
+  const otherChoices = sourceChoices
+    .filter((choice) => normalizeString(choice) !== normalizeString(answer))
+    .slice(0, 2)
+
   const fallbackDistractors = [
     'Londres',
     'Berlín',
@@ -94,15 +103,22 @@ const ensureThreeChoices = (question: QuestionItem) => {
   ]
 
   const paddedChoices = [...otherChoices]
+
   let padIndex = 0
+
   while (paddedChoices.length < 2 && padIndex < fallbackDistractors.length) {
     const distractor = fallbackDistractors[padIndex++]
-    if (!paddedChoices.some((choice) => normalizeString(choice) === normalizeString(distractor)) && normalizeString(distractor) !== normalizeString(answer)) {
+
+    if (
+      !paddedChoices.some((choice) => normalizeString(choice) === normalizeString(distractor)) &&
+      normalizeString(distractor) !== normalizeString(answer)
+    ) {
       paddedChoices.push(distractor)
     }
   }
 
   const finalChoices = [answer, ...paddedChoices].slice(0, 4)
+
   return {
     ...question,
     choices: finalChoices.sort(() => Math.random() - 0.5),
@@ -111,22 +127,49 @@ const ensureThreeChoices = (question: QuestionItem) => {
 
 const getTodayKey = () => new Date().toISOString().slice(0, 10)
 
+// Carga configuraciones guardadas o usa defaults
+const loadCustomSettings = (): QuestionSettings => {
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY_QUESTIONS)
+
+    if (!raw) {
+      return FALLBACK_SETTINGS
+    }
+
+    const parsed = JSON.parse(raw) as Partial<QuestionSettings>
+
+    return {
+      questionsPerDay:
+        parsed.questionsPerDay ?? FALLBACK_SETTINGS.questionsPerDay,
+
+      secondsPerQuestion:
+        parsed.secondsPerQuestion ?? FALLBACK_SETTINGS.secondsPerQuestion,
+    }
+  } catch {
+    return FALLBACK_SETTINGS
+  }
+}
+
 const createSeedFromString = (value: string) => {
   let hash = 0
+
   for (let i = 0; i < value.length; i += 1) {
     hash = Math.imul(31, hash) + value.charCodeAt(i)
   }
+
   return hash
 }
 
 const shuffleWithSeed = <T,>(items: T[], seedSource: string) => {
   const shuffled = [...items]
   const seed = createSeedFromString(seedSource)
+
   let randomSeed = seed
 
   const random = () => {
     randomSeed = Math.imul(randomSeed ^ (randomSeed >>> 15), randomSeed | 1)
     randomSeed ^= randomSeed + Math.imul(randomSeed ^ (randomSeed >>> 7), randomSeed | 61)
+
     return ((randomSeed ^ (randomSeed >>> 14)) >>> 0) / 4294967296
   }
 
@@ -138,23 +181,42 @@ const shuffleWithSeed = <T,>(items: T[], seedSource: string) => {
   return shuffled
 }
 
-const selectDailyQuestions = (questions: QuestionItem[], dateKey: string, count: number) => {
-  const maxQuestions = Math.min(count, QUESTIONS_PER_GAME)
+const selectDailyQuestions = (
+  questions: QuestionItem[],
+  dateKey: string,
+  count: number
+) => {
+  // Respeta la cantidad configurada por localStorage
+  const maxQuestions = Math.min(count, questions.length)
+
   const shuffled = shuffleWithSeed(questions, dateKey)
-  return shuffled.slice(0, Math.min(maxQuestions, shuffled.length)).map(ensureThreeChoices)
+
+  return shuffled
+    .slice(0, Math.min(maxQuestions, shuffled.length))
+    .map(ensureThreeChoices)
 }
 
 function App() {
   const [showStats, setShowStats] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
+
   const [visualTheme, setVisualTheme] = useState<VisualTheme>(() => {
     const savedTheme = window.localStorage.getItem('seonose-theme') as VisualTheme | null
-    if (savedTheme === 'dark' || savedTheme === 'black' || savedTheme === 'blue' || savedTheme === 'sepia' || savedTheme === 'light') {
+
+    if (
+      savedTheme === 'dark' ||
+      savedTheme === 'black' ||
+      savedTheme === 'blue' ||
+      savedTheme === 'sepia' ||
+      savedTheme === 'light'
+    ) {
       return savedTheme
     }
+
     return 'light'
   })
+
   const [questions, setQuestions] = useState<QuestionItem[]>([])
   const [allQuestions, setAllQuestions] = useState<QuestionItem[]>([])
   const [questionDate, setQuestionDate] = useState<string>(getTodayKey())
@@ -166,48 +228,135 @@ function App() {
   }, [visualTheme])
 
   useEffect(() => {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
-
+    //const baseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
+    //console.log(import.meta.env.VITE_SUPABASE_URL)
     const loadData = async () => {
       try {
-        if(use_database){
-          const [settingsResponse, questionsResponse] = await Promise.all([
-            fetch(`${baseUrl}/api/questions/settings`),
-            fetch(`${baseUrl}/api/questions`),
-          ])
+        // Configuración final que usará el juego
+        let finalSettings = loadCustomSettings()
 
-          if (!settingsResponse.ok || !questionsResponse.ok) {
-            throw new Error(
-              `Error al cargar la API de backend: settings ${settingsResponse.status} questions ${questionsResponse.status}`
+        // Si en algún momento querés usar backend
+       if (use_database) {
+          const { data, error } = await supabase
+            .from('questions')
+            .select('*')
+          
+            console.log('ERROR:')
+            console.log(error)
+
+            console.log('RAW SUPABASE DATA:')
+            console.log(JSON.stringify(data, null, 2))
+
+          if (!error && data && data.length > 0) {
+            type SupabaseQuestion = {
+              id: number
+              question: string
+              answer: string
+              choices: string[] | null
+              availablefrom?: string
+              enabled?: boolean
+            }
+
+            const questionsData: QuestionItem[] = data.map(
+              (item: SupabaseQuestion) => ({
+                id: item.id,
+                question: item.question,
+                answer: item.answer,
+                choices: item.choices ?? [],
+                availablefrom: item.availablefrom,
+                enabled: item.enabled,
+              })
             )
+
+            console.log('MAPPED QUESTIONS:')
+            console.log(JSON.stringify(questionsData, null, 2))
+            
+            const customSettings = loadCustomSettings()
+
+            finalSettings = {
+              questionsPerDay:
+                customSettings.questionsPerDay ?? FALLBACK_SETTINGS.questionsPerDay,
+
+              secondsPerQuestion:
+                customSettings.secondsPerQuestion ?? FALLBACK_SETTINGS.secondsPerQuestion,
+            }
+
+            const todayKey = getTodayKey()
+
+            const validQuestions: QuestionItem[] = questionsData
+              .filter(
+                (q) =>
+                  typeof q.question === 'string' &&
+                  typeof q.answer === 'string' &&
+                  q.enabled && (!q.availablefrom || q.availablefrom <= todayKey)
+              )
+              .map((q) => ({
+                id: q.id,
+                question: q.question ?? '',
+                answer: q.answer ?? '',
+                choices: Array.isArray(q.choices)
+                  ? q.choices.filter(
+                      (choice): choice is string =>
+                        typeof choice === 'string'
+                    )
+                  : [],
+              }))
+            console.log('VALID QUESTIONS:')
+            console.log(JSON.stringify(validQuestions, null, 2))
+            setSettings(finalSettings)
+            setAllQuestions(validQuestions)
+            setQuestionDate(todayKey)
+
+            setQuestions(
+              selectDailyQuestions(
+                validQuestions,
+                todayKey,
+                finalSettings.questionsPerDay
+              )
+            )
+
+            console.log('Preguntas cargadas desde Supabase')
+
+            return
           }
 
-          const settingsData = (await settingsResponse.json()) as QuestionSettings
-          const questionsData = (await questionsResponse.json()) as QuestionItem[]
+          console.error('Error cargando Supabase:', error)
+        }
 
-          const todayKey = getTodayKey()
-          setSettings(settingsData)
-          setAllQuestions(questionsData)
-          setQuestionDate(todayKey)
-          setQuestions(selectDailyQuestions(questionsData, todayKey, settingsData.questionsPerDay))
-        }
-        else{
-          console.log('No se pudo conectar al backend. Usando datos locales de demo.')
-          const todayKey = getTodayKey()
-          setSettings(FALLBACK_SETTINGS)
-          setAllQuestions(FALLBACK_QUESTIONS)
-          setQuestionDate(todayKey)
-          setQuestions(selectDailyQuestions(FALLBACK_QUESTIONS, todayKey, FALLBACK_SETTINGS.questionsPerDay))
-        }
-      } 
-      catch (exception) {
-        console.error(exception)
-        console.log('No se pudo conectar al backend. Usando datos locales de demo.')
+        // Fallback local
+        console.log('Usando preguntas locales de demo.')
+
         const todayKey = getTodayKey()
-        setSettings(FALLBACK_SETTINGS)
+
+        setSettings(finalSettings)
         setAllQuestions(FALLBACK_QUESTIONS)
         setQuestionDate(todayKey)
-        setQuestions(selectDailyQuestions(FALLBACK_QUESTIONS, todayKey, FALLBACK_SETTINGS.questionsPerDay))
+
+        setQuestions(
+          selectDailyQuestions(
+            FALLBACK_QUESTIONS,
+            todayKey,
+            finalSettings.questionsPerDay
+          )
+        )
+      } catch (exception) {
+        console.error(exception)
+
+        // Si algo falla, usa local
+        const finalSettings = loadCustomSettings()
+        const todayKey = getTodayKey()
+
+        setSettings(finalSettings)
+        setAllQuestions(FALLBACK_QUESTIONS)
+        setQuestionDate(todayKey)
+
+        setQuestions(
+          selectDailyQuestions(
+            FALLBACK_QUESTIONS,
+            todayKey,
+            finalSettings.questionsPerDay
+          )
+        )
       } finally {
         setLoading(false)
       }
@@ -216,14 +365,25 @@ function App() {
     loadData()
   }, [])
 
+  // Cambia automáticamente las preguntas cuando cambia el día
   useEffect(() => {
-    if (!settings || allQuestions.length === 0) return
+    if (!settings || allQuestions.length === 0) {
+      return
+    }
 
     const interval = window.setInterval(() => {
       const todayKey = getTodayKey()
+
       if (todayKey !== questionDate) {
         setQuestionDate(todayKey)
-        setQuestions(selectDailyQuestions(allQuestions, todayKey, settings.questionsPerDay))
+
+        setQuestions(
+          selectDailyQuestions(
+            allQuestions,
+            todayKey,
+            settings.questionsPerDay
+          )
+        )
       }
     }, 1000)
 
@@ -231,22 +391,46 @@ function App() {
   }, [allQuestions, questionDate, settings])
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${visualTheme === 'black' ? 'bg-black text-white' : visualTheme === 'dark' ? 'bg-slate-950 text-slate-100' : visualTheme === 'blue' ? 'bg-sky-50 text-slate-950' : visualTheme === 'sepia' ? 'bg-[#f7ede2] text-slate-950' : 'bg-slate-50 text-slate-900'}`}>
+    <div
+      className={`min-h-screen transition-colors duration-300 ${
+        visualTheme === 'black'
+          ? 'bg-black text-white'
+          : visualTheme === 'dark'
+            ? 'bg-slate-950 text-slate-100'
+            : visualTheme === 'blue'
+              ? 'bg-sky-50 text-slate-950'
+              : visualTheme === 'sepia'
+                ? 'bg-[#f7ede2] text-slate-950'
+                : 'bg-slate-50 text-slate-900'
+      }`}
+    >
       <Header
         onOpenSidebar={() => setShowSidebar(true)}
         onOpenSettings={() => setShowSettings(true)}
         onOpenStats={() => setShowStats(true)}
       />
+
       <main className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center px-4 py-8 lg:px-8">
         {loading ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-600">Cargando contenido...</div>
+          <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-600">
+            Cargando contenido...
+          </div>
         ) : (
           <div className="w-full space-y-4">
-            <QuizPanel questions={questions} settings={settings} questionDate={questionDate} />
+            <QuizPanel
+              questions={questions}
+              settings={settings}
+              questionDate={questionDate}
+            />
           </div>
         )}
       </main>
-      <Sidebar isOpen={showSidebar} onClose={() => setShowSidebar(false)} />
+
+      <Sidebar
+        isOpen={showSidebar}
+        onClose={() => setShowSidebar(false)}
+      />
+
       <SettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
@@ -254,7 +438,10 @@ function App() {
         visualTheme={visualTheme}
         onChangeTheme={setVisualTheme}
       />
-      {showStats && <StatsModal onClose={() => setShowStats(false)} />}
+
+      {showStats && (
+        <StatsModal onClose={() => setShowStats(false)} />
+      )}
     </div>
   )
 }

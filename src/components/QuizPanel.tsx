@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { QuestionItem, QuestionSettings } from '../types'
 import ShareModal from './ShareModal'
 import { supabase } from '../lib/supabase'
+
 import {
-  ensureUserProfile,
+  getOrCreateUser,
   getClientInfo,
 } from '../lib/userSession'
 
@@ -290,113 +291,120 @@ const QuizPanel = ({
     () => questions[currentIndex],
     [questions, currentIndex]
   )
-  const saveCompletedGame =
-    async ( finalAnswers: Answer[] ) => {
-      try {
-        const userId =
-          await ensureUserProfile()
+const saveCompletedGame =
+  async (
+    finalAnswers: Answer[]
+  ) => {
+    try {
+      const user =
+        await getOrCreateUser()
 
-        if (!userId) return
+      const clientInfo =
+        await getClientInfo()
 
-        const clientInfo =
-          await getClientInfo()
+      const correctCount =
+        finalAnswers.filter(
+          (a) => a.isCorrect
+        ).length
 
-        const correctAnswers =
-          finalAnswers.filter(
-            (a) => a.isCorrect
-          ).length
+      const {
+        data: gameSession,
+        error: sessionError,
+      } = await supabase
+        .from('game_sessions')
+        .insert({
+          userid: user ?? null,
 
-        /**
-         * CREA GAME SESSION
-         */
-        const {
-          data: gameSession,
-          error: sessionError,
-        } = await supabase
-          .from('game_sessions')
-          .insert({
-            userid: userId,
+          startedat:
+            new Date().toISOString(),
 
-            startedat:
-              new Date().toISOString(),
+          completedat:
+            new Date().toISOString(),
 
-            completedat:
-              new Date().toISOString(),
+          totalquestions:
+            finalAnswers.length,
 
-            totalquestions:
-              finalAnswers.length,
+          correctanswers:
+            correctCount,
 
-            correctanswers:
-              correctAnswers,
+          userip:
+            clientInfo.ip,
 
-            userip:
-              clientInfo.ip,
+          useragent:
+            clientInfo.userAgent,
+        })
+        .select()
+        .single()
 
-            useragent:
-              clientInfo.userAgent,
-          })
-          .select()
-          .single()
-
-        if (
-          sessionError ||
-          !gameSession
-        ) {
-          console.error(
-            sessionError
-          )
-
-          return
-        }
-
-        /**
-         * GUARDA RESPUESTAS
-         */
-        const answersToInsert =
-          finalAnswers.map(
-            (answer) => ({
-              gamesessionid:
-                gameSession.id,
-
-              questionid:
-                answer.questionId,
-
-              selectedanswer:
-                answer.userAnswer,
-
-              correctanswer:
-                answer.correctAnswer,
-
-              iscorrect:
-                answer.isCorrect,
-
-              responsetime:
-                answer.responseTime,
-            })
-          )
-
-        const { error: answersError } =
-          await supabase
-            .from(
-              'game_answers'
-            )
-            .insert(
-              answersToInsert
-            )
-
-        if (answersError) {
-          console.error(
-            answersError
-          )
-        }
-
-        console.log(
-          'PARTIDA GUARDADA'
+      if (
+        sessionError ||
+        !gameSession
+      ) {
+        console.error(
+          'Error creando game session',
+          sessionError
         )
-      } catch (error) {
-        console.error(error)
+
+        return
       }
+
+      const answersToInsert =
+        finalAnswers.map(
+          (answer) => ({
+            gamesessionid:
+              gameSession.id,
+
+            questionid:
+              answer.questionId,
+
+            selectedanswer:
+              answer.userAnswer,
+
+            correctanswer:
+              answer.correctAnswer,
+
+            iscorrect:
+              answer.isCorrect,
+
+            responsetime:
+              answer.responseTime,
+          })
+        )
+
+      const {
+        error: answersError,
+      } = await supabase
+        .from('game_answers')
+        .insert(
+          answersToInsert
+        )
+
+      if (answersError) {
+        console.error(
+          'Error guardando respuestas',
+          answersError
+        )
+      }
+
+      // incrementar partidas jugadas
+      if (user) {
+        await supabase
+          .from('user_profiles')
+          .update({
+            totalgamesplayed:
+              (user.totalgamesplayed ??
+                0) + 1,
+          })
+          .eq('id', user)
+      }
+
+      console.log(
+        'Partida guardada correctamente'
+      )
+    } catch (error) {
+      console.error(error)
     }
+  }
 
   const getResultOptions = (
     answerItem: Answer

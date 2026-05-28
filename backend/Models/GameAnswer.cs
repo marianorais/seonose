@@ -5,8 +5,8 @@ namespace backend.Models
     public class GameAnswer
     {
         [Key]
-        public Guid Id { get; set; }
-        public Guid GameSessionId { get; set; }
+        public int Id { get; set; }
+        public int GameSessionId { get; set; }
         public int QuestionId { get; set; }
         public string SelectedAnswer { get; set; } = string.Empty;
         public string CorrectAnswer { get; set; } = string.Empty;
@@ -14,5 +14,6 @@ namespace backend.Models
         public int ResponseTime { get; set; }
 
         public GameSession? GameSession { get; set; }
+        public QuestionItem? Question { get; set; }
     }
 }

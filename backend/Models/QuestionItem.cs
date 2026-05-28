@@ -11,5 +11,8 @@ namespace backend.Models
         [Required]
         public string Answer { get; set; } = string.Empty;
         public string[]? Choices { get; set; }
+        public bool Enabled { get; set; } = true;
+        public DateTime AvailableFrom { get; set; }
+
     }
 }

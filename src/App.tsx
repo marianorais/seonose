@@ -6,6 +6,9 @@ import SettingsModal from './components/SettingsModal'
 import StatsModal from './components/StatsModal'
 import type { QuestionItem, QuestionSettings } from './types'
 import { supabase } from './lib/supabase'
+import {
+  getLocalUserId,
+} from './lib/userSession'
 
 type VisualTheme = 'light' | 'dark' | 'black' | 'blue' | 'sepia'
 
@@ -228,6 +231,39 @@ function App() {
   }, [visualTheme])
 
   useEffect(() => {
+  const createAnonymousUser =
+    async () => {
+      const existingUser =
+        getLocalUserId()
+
+      if (existingUser) {
+        return
+      }
+
+      const randomUsername =
+        `Jugador_${Math.floor(
+          Math.random() * 100000
+        )}`
+
+      const { data, error } =
+        await supabase
+          .from('user_profiles')
+          .insert({
+            username: randomUsername,
+          })
+          .select()
+          .single()
+
+      if (error || !data) {
+        console.error(error)
+        return
+      }
+    }
+
+  createAnonymousUser()
+}, [])
+
+  useEffect(() => {
     //const baseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
     //console.log(import.meta.env.VITE_SUPABASE_URL)
     const loadData = async () => {
@@ -288,7 +324,7 @@ function App() {
                 (q) =>
                   typeof q.question === 'string' &&
                   typeof q.answer === 'string' &&
-                  q.enabled && (!q.availablefrom || q.availablefrom <= todayKey)
+                  q.enabled && (!q.availablefrom || q.availablefrom === todayKey)
               )
               .map((q) => ({
                 id: q.id,
@@ -367,6 +403,7 @@ function App() {
 
   // Cambia automáticamente las preguntas cuando cambia el día
   useEffect(() => {
+    
     if (!settings || allQuestions.length === 0) {
       return
     }

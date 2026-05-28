@@ -5,8 +5,8 @@ namespace backend.Models
     public class GameSession
     {
         [Key]
-        public Guid Id { get; set; }
-        public Guid? UserId { get; set; }
+        public int Id { get; set; }
+        public int? UserId { get; set; }
         public DateTime StartedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
         public int TotalQuestions { get; set; }

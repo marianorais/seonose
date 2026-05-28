@@ -9,7 +9,7 @@ import {
 import './index.css'
 
 import App from './App.tsx'
-import AddQuestionPage from './pages/AddQuestionPage.tsx'
+import AdminPreguntasPage from './pages/PanelAdministracionPreguntas.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -22,7 +22,7 @@ createRoot(document.getElementById('root')!).render(
 
         <Route
           path="/addQuestion"
-          element={<AddQuestionPage />}
+          element={<AdminPreguntasPage />}
         />
       </Routes>
     </BrowserRouter>

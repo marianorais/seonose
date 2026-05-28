@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { QuestionItem, QuestionSettings } from '../types'
 import ShareModal from './ShareModal'
+import { supabase } from '../lib/supabase'
+import {
+  ensureUserProfile,
+  getClientInfo,
+} from '../lib/userSession'
 
 interface Answer {
   questionId: number
@@ -208,6 +213,7 @@ const QuizPanel = ({
     []
   )
 
+  
   const [currentIndex, setCurrentIndex] =
     useState<number>(
       savedState?.currentIndex ?? 0
@@ -284,6 +290,113 @@ const QuizPanel = ({
     () => questions[currentIndex],
     [questions, currentIndex]
   )
+  const saveCompletedGame =
+    async ( finalAnswers: Answer[] ) => {
+      try {
+        const userId =
+          await ensureUserProfile()
+
+        if (!userId) return
+
+        const clientInfo =
+          await getClientInfo()
+
+        const correctAnswers =
+          finalAnswers.filter(
+            (a) => a.isCorrect
+          ).length
+
+        /**
+         * CREA GAME SESSION
+         */
+        const {
+          data: gameSession,
+          error: sessionError,
+        } = await supabase
+          .from('game_sessions')
+          .insert({
+            userid: userId,
+
+            startedat:
+              new Date().toISOString(),
+
+            completedat:
+              new Date().toISOString(),
+
+            totalquestions:
+              finalAnswers.length,
+
+            correctanswers:
+              correctAnswers,
+
+            userip:
+              clientInfo.ip,
+
+            useragent:
+              clientInfo.userAgent,
+          })
+          .select()
+          .single()
+
+        if (
+          sessionError ||
+          !gameSession
+        ) {
+          console.error(
+            sessionError
+          )
+
+          return
+        }
+
+        /**
+         * GUARDA RESPUESTAS
+         */
+        const answersToInsert =
+          finalAnswers.map(
+            (answer) => ({
+              gamesessionid:
+                gameSession.id,
+
+              questionid:
+                answer.questionId,
+
+              selectedanswer:
+                answer.userAnswer,
+
+              correctanswer:
+                answer.correctAnswer,
+
+              iscorrect:
+                answer.isCorrect,
+
+              responsetime:
+                answer.responseTime,
+            })
+          )
+
+        const { error: answersError } =
+          await supabase
+            .from(
+              'game_answers'
+            )
+            .insert(
+              answersToInsert
+            )
+
+        if (answersError) {
+          console.error(
+            answersError
+          )
+        }
+
+        console.log(
+          'PARTIDA GUARDADA'
+        )
+      } catch (error) {
+        console.error(error)
+      }
+    }
 
   const getResultOptions = (
     answerItem: Answer
@@ -465,7 +578,7 @@ const QuizPanel = ({
     setShowFeedback(true)
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (
       !currentQuestion ||
       !showFeedback
@@ -505,17 +618,18 @@ const QuizPanel = ({
       ...answers,
       newAnswer,
     ]
-
+    
     setAnswers(nextAnswers)
 
     const nextIndex =
       currentIndex + 1
 
-    if (
-      nextIndex >=
-      questions.length
-    ) {
+    if (nextIndex >=questions.length) {
       saveResultToHistory(
+        nextAnswers
+      )
+
+      await saveCompletedGame(
         nextAnswers
       )
 
@@ -538,35 +652,36 @@ const QuizPanel = ({
     setQuestionStartTime(Date.now())
   }
 
-  const handleChoice = (
-    choice: string
-  ) => {
-    if (
-      finished ||
-      showFeedback
-    )
-      return
+  const handleChoice = (choice: string) => {
+      if (finished ||showFeedback)
+        return
 
-    setTempAnswer(choice)
-    setShowFeedback(true)
-  }
+      setTempAnswer(choice)
+      setShowFeedback(true)
+    }
 
-  const handleRetry = () => {
-    resetQuiz()
-  }
+    const handleRetry = () => {
+      resetQuiz()
+    }
 
-  const handleShareOpen = () => {
-    const correctCount = answers.filter(
-      (a) => a.isCorrect
-    ).length
+    const handleShareOpen = () => {
+      const correctCount = answers.filter(
+        (a) => a.isCorrect
+      ).length
 
-    const total = answers.length
+      const total = answers.length
 
-    const text = `Se o NoSe #${gameNumber} ${correctCount}/${total} ${window.location.origin}`
+      const text =
+        `🧠 Se o NoSe #${gameNumber}
 
-    setShareText(text)
-    setShareOpen(true)
-  }
+        🎯 ${correctCount}/${total} correctas
+
+        👉 ${window.location.origin}`
+
+      setShareText(text)
+
+      setShareOpen(true)
+    }
 
   if (
     !settings ||
@@ -702,7 +817,7 @@ const QuizPanel = ({
                               normalize(
                                 answerItem.correctAnswer
                               )
-
+                                
                             const optionClasses =
                               'border-slate-200 bg-slate-50 text-slate-600'
 

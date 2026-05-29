@@ -11,3 +11,11 @@ export interface QuestionSettings {
   questionsPerDay: number
   secondsPerQuestion: number
 }
+
+export interface GameSettings {
+  id: number
+  questionspergame: number
+  secondsperquestion: number
+  backgroundcolor: string
+  fontfamily: string
+}

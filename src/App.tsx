@@ -7,6 +7,7 @@ import StatsModal from './components/StatsModal'
 import type { QuestionItem, QuestionSettings } from './types'
 import { supabase } from './lib/supabase'
 
+
 type VisualTheme = 'light' | 'dark' | 'black' | 'blue' | 'sepia'
 
 const FALLBACK_SETTINGS: QuestionSettings = {
@@ -66,6 +67,7 @@ const normalizeString = (value?: string) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
+
 const ensureThreeChoices = (question: QuestionItem) => {
   const answer = (question.answer ?? '').trim()
 
@@ -124,30 +126,50 @@ const ensureThreeChoices = (question: QuestionItem) => {
     choices: finalChoices.sort(() => Math.random() - 0.5),
   }
 }
-
-const getTodayKey = () => new Date().toISOString().slice(0, 10)
+const getTodayKey = () => {
+  return new Intl.DateTimeFormat(
+    'en-CA',
+    {
+      timeZone:
+        'America/Argentina/Buenos_Aires',
+    }
+  ).format(new Date())
+}
 
 // Carga configuraciones guardadas o usa defaults
-const loadCustomSettings = (): QuestionSettings => {
-  try {
-    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY_QUESTIONS)
+const loadCustomSettings =
+  (): QuestionSettings => {
+    try {
+      const raw =
+        window.localStorage.getItem(
+          SETTINGS_STORAGE_KEY_QUESTIONS
+        )
 
-    if (!raw) {
+      if (!raw) {
+        return FALLBACK_SETTINGS
+      }
+
+      const parsed =
+        JSON.parse(
+          raw
+        ) as Partial<QuestionSettings>
+
+      return {
+        questionsPerDay:
+          Number(
+            parsed.questionsPerDay
+          ) ||
+          FALLBACK_SETTINGS.questionsPerDay,
+
+        secondsPerQuestion:
+          Number(
+            parsed.secondsPerQuestion
+          ) ||
+          FALLBACK_SETTINGS.secondsPerQuestion,
+      }
+    } catch {
       return FALLBACK_SETTINGS
     }
-
-    const parsed = JSON.parse(raw) as Partial<QuestionSettings>
-
-    return {
-      questionsPerDay:
-        parsed.questionsPerDay ?? FALLBACK_SETTINGS.questionsPerDay,
-
-      secondsPerQuestion:
-        parsed.secondsPerQuestion ?? FALLBACK_SETTINGS.secondsPerQuestion,
-    }
-  } catch {
-    return FALLBACK_SETTINGS
-  }
 }
 
 const createSeedFromString = (value: string) => {
@@ -271,16 +293,21 @@ function App() {
             console.log('MAPPED QUESTIONS:')
             console.log(JSON.stringify(questionsData, null, 2))
             
+            const { data: gameSettings } =
+              await supabase
+                .from('game_settings')
+                .select('*')
+                .single()
             const customSettings = loadCustomSettings()
 
             finalSettings = {
               questionsPerDay:
-                customSettings.questionsPerDay ?? FALLBACK_SETTINGS.questionsPerDay,
+                gameSettings?.questionspergame ?? customSettings.questionsPerDay ?? FALLBACK_SETTINGS.questionsPerDay,
 
               secondsPerQuestion:
-                customSettings.secondsPerQuestion ?? FALLBACK_SETTINGS.secondsPerQuestion,
+                gameSettings?.secondsperquestion  ?? customSettings.secondsPerQuestion ?? FALLBACK_SETTINGS.secondsPerQuestion,
             }
-
+            console.log('GAME SETTINGS FROM SUPABASE:', gameSettings ?? 'No game settings found, using custom/local settings')
             const todayKey = getTodayKey()
 
             const validQuestions: QuestionItem[] = questionsData
@@ -288,7 +315,7 @@ function App() {
                 (q) =>
                   typeof q.question === 'string' &&
                   typeof q.answer === 'string' &&
-                  q.enabled && (!q.availablefrom || q.availablefrom === todayKey)
+                  q.enabled && (!q.availablefrom || q.availablefrom.slice(0,10) === todayKey)
               )
               .map((q) => ({
                 id: q.id,

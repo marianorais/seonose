@@ -10,6 +10,7 @@ import './index.css'
 
 import App from './App.tsx'
 import AdminPreguntasPage from './pages/PanelAdministracionPreguntas.tsx'
+import GameSettingsPage from './pages/GameSettingsPage.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -23,6 +24,10 @@ createRoot(document.getElementById('root')!).render(
         <Route
           path="/addQuestion"
           element={<AdminPreguntasPage />}
+        />
+        <Route
+          path="/settings"
+          element={<GameSettingsPage />}
         />
       </Routes>
     </BrowserRouter>

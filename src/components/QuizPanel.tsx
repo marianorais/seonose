@@ -4,7 +4,6 @@ import ShareModal from './ShareModal'
 import { supabase } from '../lib/supabase'
 
 import {
-  getOrCreateUser,
   getClientInfo,
 } from '../lib/userSession'
 
@@ -296,11 +295,20 @@ const saveCompletedGame =
     finalAnswers: Answer[]
   ) => {
     try {
-      const user =
-        await getOrCreateUser()
-
       const clientInfo =
         await getClientInfo()
+
+      /**
+       * Si no hay IP,
+       * NO guardar.
+       */
+      if (!clientInfo.ip) {
+        console.warn(
+          'No se pudo obtener IP'
+        )
+
+        return
+      }
 
       const correctCount =
         finalAnswers.filter(
@@ -313,8 +321,6 @@ const saveCompletedGame =
       } = await supabase
         .from('game_sessions')
         .insert({
-          userid: user ?? null,
-
           startedat:
             new Date().toISOString(),
 
@@ -341,7 +347,7 @@ const saveCompletedGame =
         !gameSession
       ) {
         console.error(
-          'Error creando game session',
+          'Error creando sesión',
           sessionError
         )
 
@@ -381,25 +387,12 @@ const saveCompletedGame =
 
       if (answersError) {
         console.error(
-          'Error guardando respuestas',
           answersError
         )
       }
 
-      // incrementar partidas jugadas
-      if (user) {
-        await supabase
-          .from('user_profiles')
-          .update({
-            totalgamesplayed:
-              (user.totalgamesplayed ??
-                0) + 1,
-          })
-          .eq('id', user)
-      }
-
       console.log(
-        'Partida guardada correctamente'
+        'PARTIDA GUARDADA'
       )
     } catch (error) {
       console.error(error)

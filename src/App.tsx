@@ -290,8 +290,6 @@ function App() {
               })
             )
 
-            console.log('MAPPED QUESTIONS:')
-            console.log(JSON.stringify(questionsData, null, 2))
             
             const { data: gameSettings } =
               await supabase

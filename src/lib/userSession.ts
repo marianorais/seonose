@@ -1,4 +1,3 @@
-import { supabase } from './supabase'
 
 const USER_ID_KEY = 'seonose-user-id'
 

@@ -390,10 +390,6 @@ const saveCompletedGame =
           answersError
         )
       }
-
-      console.log(
-        'PARTIDA GUARDADA'
-      )
     } catch (error) {
       console.error(error)
     }

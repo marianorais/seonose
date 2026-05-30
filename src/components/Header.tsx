@@ -24,7 +24,7 @@ const Header = ({ onOpenSidebar, onOpenSettings, onOpenStats }: HeaderProps) => 
             <img
               src={new URL('../assets/logo.jpg', import.meta.url).href}
               alt="Logo de la aplicación"
-              className="h-12 w-auto cursor-pointer object-contain transition hover:opacity-90"
+              className="h-20 w-auto cursor-pointer object-contain transition hover:opacity-90"
             />
           </Link>
         </div>

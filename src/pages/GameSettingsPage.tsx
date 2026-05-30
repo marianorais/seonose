@@ -187,26 +187,92 @@ function GameSettingsPage() {
               <select
                 value={fontFamily}
                 onChange={(event) =>
-                  setFontFamily(
-                    event.target.value
-                  )
+                  setFontFamily(event.target.value)
                 }
                 className="w-full rounded-xl border border-slate-300 px-4 py-3"
               >
                 <option value="Inter">
-                  Inter
+                  Inter (Moderna)
                 </option>
 
-                <option value="Arial">
-                  Arial
+                <option value="Poppins">
+                  Poppins
                 </option>
 
                 <option value="Roboto">
                   Roboto
                 </option>
 
-                <option value="Poppins">
-                  Poppins
+                <option value="Open Sans">
+                  Open Sans
+                </option>
+
+                <option value="Montserrat">
+                  Montserrat
+                </option>
+
+                <option value="Nunito">
+                  Nunito
+                </option>
+
+                <option value="Lato">
+                  Lato
+                </option>
+
+                <option value="Ubuntu">
+                  Ubuntu
+                </option>
+
+                <option value="Arial">
+                  Arial
+                </option>
+
+                <option value="Verdana">
+                  Verdana
+                </option>
+
+                <option value="Tahoma">
+                  Tahoma
+                </option>
+
+                <option value="Trebuchet MS">
+                  Trebuchet MS
+                </option>
+
+                <option value="Georgia">
+                  Georgia
+                </option>
+
+                <option value="Times New Roman">
+                  Times New Roman
+                </option>
+
+                <option value="Courier New">
+                  Courier New
+                </option>
+
+                <option value="Comic Sans MS">
+                  Comic Sans MS
+                </option>
+
+                <option value="Bangers">
+                  Bangers (Gaming)
+                </option>
+
+                <option value="Press Start 2P">
+                  Press Start 2P (Retro)
+                </option>
+
+                <option value="Orbitron">
+                  Orbitron (Futurista)
+                </option>
+
+                <option value="Audiowide">
+                  Audiowide
+                </option>
+
+                <option value="Exo 2">
+                  Exo 2
                 </option>
               </select>
             </div>

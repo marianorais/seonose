@@ -4,7 +4,7 @@ import QuizPanel from './components/QuizPanel'
 import Sidebar from './components/Sidebar'
 import SettingsModal from './components/SettingsModal'
 import StatsModal from './components/StatsModal'
-import type { QuestionItem, QuestionSettings } from './types'
+import type { QuestionItem, QuestionSettings, GameSettings } from './types'
 import { supabase } from './lib/supabase'
 
 
@@ -222,6 +222,7 @@ function App() {
   const [showStats, setShowStats] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
+  const [gameSettings, setGameSettings] = useState<GameSettings | null>(null)
 
   const [visualTheme, setVisualTheme] = useState<VisualTheme>(() => {
     const savedTheme = window.localStorage.getItem('seonose-theme') as VisualTheme | null
@@ -248,6 +249,13 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem('seonose-theme', visualTheme)
   }, [visualTheme])
+
+  useEffect(() => {
+    if (!gameSettings) {
+      return
+    }
+    document.body.style.fontFamily = gameSettings.fontfamily || 'sans-serif'
+  }, [gameSettings])
 
   useEffect(() => {
     //const baseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -297,6 +305,8 @@ function App() {
                 .select('*')
                 .single()
             const customSettings = loadCustomSettings()
+
+            if (gameSettings) {setGameSettings(gameSettings)}
 
             finalSettings = {
               questionsPerDay:
@@ -418,17 +428,12 @@ function App() {
 
   return (
     <div
-      className={`min-h-screen transition-colors duration-300 ${
-        visualTheme === 'black'
-          ? 'bg-black text-white'
-          : visualTheme === 'dark'
-            ? 'bg-slate-950 text-slate-100'
-            : visualTheme === 'blue'
-              ? 'bg-sky-50 text-slate-950'
-              : visualTheme === 'sepia'
-                ? 'bg-[#f7ede2] text-slate-950'
-                : 'bg-slate-50 text-slate-900'
-      }`}
+      className="min-h-screen transition-colors duration-300"
+      style={{
+        backgroundColor: gameSettings?.backgroundcolor ?? '#f8fafc',
+
+        fontFamily: gameSettings?.fontfamily ?? 'sans-serif',
+      }}
     >
       <Header
         onOpenSidebar={() => setShowSidebar(true)}

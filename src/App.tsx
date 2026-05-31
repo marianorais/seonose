@@ -20,6 +20,7 @@ const SETTINGS_STORAGE_KEY_QUESTIONS = 'seonose-custom-settings-questions'
 
 // Flag temporal para usar o no backend
 const use_database = true
+const allowReplay = window.location.pathname === '/repetir'
 
 const FALLBACK_QUESTIONS: QuestionItem[] = [
   { id: 1, question: '¿Cuál es la capital de Nigeria?', answer: 'Abuya', choices: ['Lagos', 'Abuya', 'Kano'] },
@@ -452,6 +453,7 @@ function App() {
               questions={questions}
               settings={settings}
               questionDate={questionDate}
+              allowReplay={allowReplay}
             />
           </div>
         )}

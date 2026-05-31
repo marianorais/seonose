@@ -19,7 +19,8 @@ interface Answer {
 interface QuizPanelProps {
   questions: QuestionItem[]
   settings: QuestionSettings | null
-  questionDate: string
+  questionDate: string,
+  allowReplay: boolean
 }
 
 /**
@@ -199,6 +200,7 @@ const QuizPanel = ({
   questions,
   settings,
   questionDate,
+  allowReplay,
 }: QuizPanelProps) => {
   const savedState =
     typeof window !== 'undefined'
@@ -668,12 +670,12 @@ const saveCompletedGame =
 
       const total = answers.length
 
-      const text =
-        `🧠 Se o NoSe #${gameNumber}
-
-        🎯 ${correctCount}/${total} correctas
-
-        👉 ${window.location.origin}`
+      const text = [
+        `🧠 Se o NoSe #${gameNumber}`,
+        `🎯 Hice ${correctCount}/${total} correctas`,
+        `🤔 ¿Podés superarme?`,
+        `👉 ${window.location.origin}`,
+      ].join('\n')
 
       setShareText(text)
 
@@ -857,22 +859,26 @@ const saveCompletedGame =
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={
-                handleRetry
-              }
-              className="rounded-3xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-700"
-            >
-              Reintentar
-            </button>
+          <div
+            className={`grid gap-3 ${
+              allowReplay
+                ? 'sm:grid-cols-2'
+                : 'sm:grid-cols-1'
+            }`}
+          >
+            {allowReplay && (
+              <button
+                type="button"
+                onClick={handleRetry}
+                className="rounded-3xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-700"
+              >
+                Reintentar
+              </button>
+            )}
 
             <button
               type="button"
-              onClick={
-                handleShareOpen
-              }
+              onClick={handleShareOpen}
               className="rounded-3xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50"
             >
               Compartir resultado

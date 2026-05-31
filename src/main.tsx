@@ -20,13 +20,17 @@ createRoot(document.getElementById('root')!).render(
           path="/"
           element={<App />}
         />
+        <Route
+          path="/repetir"
+          element={<App />}
+        />
 
         <Route
-          path="/addQuestion"
+          path="/preguntas"
           element={<AdminPreguntasPage />}
         />
         <Route
-          path="/settings"
+          path="/configuraciones"
           element={<GameSettingsPage />}
         />
       </Routes>

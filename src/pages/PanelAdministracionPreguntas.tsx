@@ -127,7 +127,15 @@ function AdminPreguntasPage() {
     questionsList,
     setQuestionsList,
   ] = useState<QuestionAdminItem[]>([])
+  const [searchQuery, setSearchQuery] =
+    useState('')
 
+  const [customDateFrom, setCustomDateFrom] =
+    useState('')
+  const [customDateTo, setCustomDateTo] =
+    useState('')
+  const [showOnlyRepeatable, setShowOnlyRepeatable] =
+    useState(false)
   const [editingId, setEditingId] =
     useState<number | null>(null)
 
@@ -376,6 +384,72 @@ function AdminPreguntasPage() {
       setLoading(false)
     }
   }
+
+  const filteredQuestions = questionsList
+    .filter((item) => {
+      const query = searchQuery.trim().toLowerCase()
+
+      const matchesQuery =
+        query === '' ||
+        [item.question, item.answer, ...item.choices]
+          .some((value) =>
+            value
+              .toLowerCase()
+              .includes(query)
+          )
+
+      if (!matchesQuery) {
+        return false
+      }
+
+      // Filter by repeatable (checkbox): when checked, show only repeatable questions
+      if (showOnlyRepeatable && !item.repeatable) {
+        return false
+      }
+
+      // Date range filter: if both empty, don't filter by date
+      const availableDate = item.availablefrom
+        ? new Date(item.availablefrom)
+        : null
+
+      if (!customDateFrom && !customDateTo) {
+        return true
+      }
+
+      if (!availableDate) {
+        return false
+      }
+
+      if (customDateFrom) {
+        const fromDate = new Date(customDateFrom)
+        fromDate.setHours(0, 0, 0, 0)
+
+        if (availableDate < fromDate) {
+          return false
+        }
+      }
+
+      if (customDateTo) {
+        const toDate = new Date(customDateTo)
+        toDate.setHours(23, 59, 59, 999)
+
+        if (availableDate > toDate) {
+          return false
+        }
+      }
+
+      return true
+    })
+    .sort((a, b) => {
+      const aDate = a.availablefrom
+        ? new Date(a.availablefrom).getTime()
+        : 0
+      const bDate = b.availablefrom
+        ? new Date(b.availablefrom).getTime()
+        : 0
+
+      return aDate - bDate
+    })
 
   return (
     <div
@@ -685,25 +759,84 @@ function AdminPreguntasPage() {
           </form>
         </div>
 
-        <div className="mt-10 space-y-4">
-          <h2 className="text-2xl font-bold">
-            Preguntas
-            cargadas
-          </h2>
+        <div className="mt-10 space-y-6">
+          <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">Preguntas cargadas</h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Busca y filtra preguntas.
+              </p>
+            </div>
 
-          {questionsList.map(
-            (item) => (
+            <div className="grid gap-3 sm:grid-cols-2 xl:w-1/2">
+              <label className="block">
+                <span className="text-sm font-medium text-slate-700">Buscar pregunta</span>
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Texto, respuesta o opción"
+                  className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white"
+                />
+              </label>
+
+              <div className="grid gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-sm font-medium text-slate-700">Desde</span>
+                    <input
+                      type="date"
+                      value={customDateFrom}
+                      onChange={(event) => setCustomDateFrom(event.target.value)}
+                      className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-medium text-slate-700">Hasta</span>
+                    <input
+                      type="date"
+                      value={customDateTo}
+                      onChange={(event) => setCustomDateTo(event.target.value)}
+                      className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white"
+                    />
+                  </label>
+                </div>
+
+                <label className="mt-2 flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyRepeatable}
+                    onChange={(e) => setShowOnlyRepeatable(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900"
+                  />
+                  <span className="text-sm font-medium text-slate-700">Mostrar solo repetibles</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm">
+            <p className="text-sm text-slate-600">
+              Mostrando {filteredQuestions.length} de {questionsList.length} preguntas.
+            </p>
+          </div>
+
+          {filteredQuestions.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm">
+              <p className="text-sm text-slate-600">
+                No hay preguntas que coincidan con el filtro.
+              </p>
+            </div>
+          ) : (
+            filteredQuestions.map((item) => (
               <div
-                key={
-                  item.id
-                }
+                key={item.id}
                 className={`rounded-2xl border p-5 ${
-                  visualTheme ===
-                    'black' ||
-                  visualTheme ===
-                    'dark'
-                    ? 'border-slate-700 bg-slate-900'
-                    : 'border-slate-200 bg-white'
+                  visualTheme === 'black' ||
+                  visualTheme === 'dark'
+                    ? 'border-slate-700 bg-slate-900 text-slate-100'
+                    : 'border-slate-200 bg-white text-slate-900'
                 }`}
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -786,7 +919,7 @@ function AdminPreguntasPage() {
                   </div>
                 </div>
               </div>
-            )
+            ))
           )}
         </div>
       </main>

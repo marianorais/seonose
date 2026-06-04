@@ -158,7 +158,7 @@ function GameSettingsPage () {
                     )
                   )
                 }
-                className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
               />
             </div>
 
@@ -179,7 +179,7 @@ function GameSettingsPage () {
                     )
                   )
                 }
-                className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
               />
             </div>
 
@@ -198,7 +198,7 @@ function GameSettingsPage () {
                     event.target.value
                   )
                 }
-                className="h-14 w-full rounded-xl border border-slate-300"
+                className="h-14 w-full rounded-xl border border-slate-300 bg-white text-slate-900"
               />
             </div>
 
@@ -212,7 +212,7 @@ function GameSettingsPage () {
                 onChange={(event) =>
                   setFontFamily(event.target.value)
                 }
-                className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
               >
                 <option value="Inter">
                   Inter (Moderna)

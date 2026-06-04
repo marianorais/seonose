@@ -284,6 +284,13 @@ function AdminPreguntasPage() {
     setRepeatable(false)
   }
 
+  const resetFilters = () => {
+    setSearchQuery('')
+    setCustomDateFrom('')
+    setCustomDateTo('')
+    setShowOnlyRepeatable(false)
+  }
+
   const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>
   ) => {
@@ -812,6 +819,15 @@ function AdminPreguntasPage() {
                   />
                   <span className="text-sm font-medium text-slate-700">Mostrar solo repetibles</span>
                 </label>
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Restablecer filtros
+                  </button>
+                </div>
               </div>
             </div>
           </div>

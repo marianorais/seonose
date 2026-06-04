@@ -1,9 +1,15 @@
+/**
+ * Página de administración de preguntas.
+ * Permite CRUD de preguntas en la base de datos (vía Supabase).
+ * No modifica la API ni comportamiento; añade claridad y pequeños ajustes.
+ */
 import { useEffect, useState } from 'react'
 
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 import SettingsModal from '../components/SettingsModal'
 import StatsModal from '../components/StatsModal'
+import { loadThemeConfig } from '../lib/themeConfig'
 
 import type { QuestionSettings } from '../types'
 
@@ -23,6 +29,7 @@ interface QuestionAdminItem {
   choices: string[]
   availablefrom: string
   enabled: boolean
+  repeatable: boolean
 }
 
 const tomorrow = () => {
@@ -46,6 +53,9 @@ const tomorrow = () => {
 function AdminPreguntasPage() {
   const [showSidebar, setShowSidebar] =
     useState(false)
+
+  const [themeConfig, setThemeConfig] =
+    useState(() => loadThemeConfig())
 
   const [showSettings, setShowSettings] =
     useState(false)
@@ -101,6 +111,9 @@ function AdminPreguntasPage() {
     setAvailableFrom,
   ] = useState(tomorrow())
 
+  const [repeatable, setRepeatable] =
+    useState(false)
+
   const [loading, setLoading] =
     useState(false)
 
@@ -145,6 +158,7 @@ function AdminPreguntasPage() {
             choices: string[]
             availablefrom: string
             enabled: boolean
+            repeatable?: boolean
           }) => ({
             id: item.id,
             question:
@@ -158,6 +172,8 @@ function AdminPreguntasPage() {
               item.availablefrom,
             enabled:
               item.enabled,
+            repeatable:
+              item.repeatable ?? false,
           })
         )
 
@@ -168,6 +184,7 @@ function AdminPreguntasPage() {
 
   useEffect(() => {
     loadQuestions()
+    setThemeConfig(loadThemeConfig())
   }, [])
 
   const toggleEnabled =
@@ -231,6 +248,10 @@ function AdminPreguntasPage() {
       questionItem.availablefrom
     )
 
+    setRepeatable(
+      questionItem.repeatable ?? false
+    )
+
     window.scrollTo({
       top: 0,
       behavior: 'smooth',
@@ -251,6 +272,8 @@ function AdminPreguntasPage() {
     setAvailableFrom(
       tomorrow()
     )
+
+    setRepeatable(false)
   }
 
   const handleSubmit = async (
@@ -292,6 +315,8 @@ function AdminPreguntasPage() {
 
                 availablefrom,
 
+                repeatable,
+
                 enabled: true,
               })
               .eq(
@@ -313,6 +338,8 @@ function AdminPreguntasPage() {
                 choices,
 
                 availablefrom,
+
+                repeatable,
 
                 enabled: true,
               })
@@ -355,18 +382,22 @@ function AdminPreguntasPage() {
       className={`min-h-screen transition-colors duration-300 ${
         visualTheme ===
         'black'
-          ? 'bg-black text-white'
+          ? 'text-white'
           : visualTheme ===
               'dark'
-            ? 'bg-slate-950 text-slate-100'
+            ? 'text-slate-100'
             : visualTheme ===
                 'blue'
-              ? 'bg-sky-50 text-slate-950'
+              ? 'text-slate-950'
               : visualTheme ===
                   'sepia'
-                ? 'bg-[#f7ede2] text-slate-950'
-                : 'bg-slate-50 text-slate-900'
+                ? 'text-slate-950'
+                : 'text-slate-900'
       }`}
+      style={{
+        backgroundColor: themeConfig.backgroundColor,
+        fontFamily: themeConfig.fontFamily,
+      }}
     >
       <Header
         onOpenSidebar={() =>
@@ -597,6 +628,21 @@ function AdminPreguntasPage() {
               />
             </div>
 
+            <div className="flex items-center gap-3">
+              <input
+                id="repeatable"
+                type="checkbox"
+                checked={repeatable}
+                onChange={(event) =>
+                  setRepeatable(event.target.checked)
+                }
+                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+              />
+              <label htmlFor="repeatable" className="text-sm font-medium">
+                Pregunta repetible
+              </label>
+            </div>
+
             {success && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                 {success}
@@ -687,6 +733,21 @@ function AdminPreguntasPage() {
                         {item.enabled
                           ? 'Habilitada'
                           : 'Deshabilitada'}
+                      </span>
+                    </p>
+
+                    <p className="text-sm">
+                      Repetible:{' '}
+                      <span
+                        className={
+                          item.repeatable
+                            ? 'text-green-600'
+                            : 'text-slate-600'
+                        }
+                      >
+                        {item.repeatable
+                          ? 'Sí'
+                          : 'No'}
                       </span>
                     </p>
                   </div>

@@ -10,9 +10,6 @@ const InfoBanner = () => {
           Nuevo desafío cada día
         </div>
       </div>
-      <p className="mt-4 text-slate-400">
-        Una interfaz inspirada en el estilo del sitio original. Utiliza seis intentos para adivinar la palabra de cinco letras.
-      </p>
     </div>
   )
 }

@@ -4,11 +4,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace backend.Services
 {
+    /// <summary>
+    /// Repositorio que expone métodos para acceder a preguntas, sesiones y usuarios.
+    /// Implementa <see cref="IGameRepository"/>.
+    /// </summary>
     public sealed class QuestionRepository : IGameRepository
     {
         private readonly SeonoseDbContext _context;
         private readonly QuestionSettings _settings;
 
+        // Preguntas por defecto usadas como seed si la BDD está vacía.
         private static readonly IReadOnlyList<QuestionItem> DefaultQuestions = new List<QuestionItem>
         {
             new QuestionItem { Id = 1, Question = "¿Cuál es la capital de Nigeria?", Answer = "Abuya", Choices = new[] { "Lagos", "Abuya", "Kano", "Accra" } },
@@ -58,9 +63,13 @@ namespace backend.Services
                 SecondsPerQuestion = 30
             };
 
+            // Asegura datos iniciales si la BD no contiene preguntas.
             EnsureSeedData();
         }
 
+        /// <summary>
+        /// Inserta preguntas por defecto si la tabla está vacía.
+        /// </summary>
         private void EnsureSeedData()
         {
             if (!_context.Questions.Any())
@@ -70,10 +79,13 @@ namespace backend.Services
             }
         }
 
+        /// <inheritdoc/>
         public QuestionSettings GetSettings() => _settings;
 
+        /// <inheritdoc/>
         public IReadOnlyList<QuestionItem> GetQuestions() => _context.Questions.AsNoTracking().ToList();
 
+        /// <inheritdoc/>
         public IReadOnlyList<QuestionItem> GetDailyQuestions()
         {
             var questions = _context.Questions.AsNoTracking().OrderBy(q => q.Id).ToList();
@@ -86,12 +98,14 @@ namespace backend.Services
             return result;
         }
 
+        /// <inheritdoc/>
         public void RecordGameSession(GameSession session)
         {
             _context.GameSessions.Add(session);
             _context.SaveChanges();
         }
 
+        /// <inheritdoc/>
         public IReadOnlyList<GameSession> GetRecentGameSessions() =>
             _context.GameSessions
                 .Include(gs => gs.Answers)
@@ -100,8 +114,10 @@ namespace backend.Services
                 .Take(20)
                 .ToList();
 
+        /// <inheritdoc/>
         public IReadOnlyList<UserProfile> GetUsers() => _context.Users.AsNoTracking().ToList();
 
+        /// <inheritdoc/>
         public UserProfile? GetUserById(Guid id) => _context.Users.Find(id);
     }
 }

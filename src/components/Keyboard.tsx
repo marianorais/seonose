@@ -1,32 +1,36 @@
+/**
+ * Componente teclado virtual. Variables internas renombradas a castellano
+ * para mejorar la legibilidad sin alterar la UI ni eventos.
+ */
 const Keyboard = () => {
-  const row1 = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P']
-  const row2 = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ñ']
-  const row3 = ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'BACK']
+  const fila1 = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P']
+  const fila2 = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ñ']
+  const fila3 = ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'BACK']
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap justify-center gap-2">
-        {row1.map((key) => (
-          <button key={key} type="button" className="keyboard-key">
-            {key}
+        {fila1.map((tecla) => (
+          <button key={tecla} type="button" className="keyboard-key">
+            {tecla}
           </button>
         ))}
       </div>
       <div className="flex flex-wrap justify-center gap-2">
-        {row2.map((key) => (
-          <button key={key} type="button" className="keyboard-key">
-            {key}
+        {fila2.map((tecla) => (
+          <button key={tecla} type="button" className="keyboard-key">
+            {tecla}
           </button>
         ))}
       </div>
       <div className="flex flex-wrap justify-center gap-2">
-        {row3.map((key) => (
+        {fila3.map((tecla) => (
           <button
-            key={key}
+            key={tecla}
             type="button"
-            className={`keyboard-key ${key === 'ENTER' || key === 'BACK' ? 'keyboard-key-special' : ''}`}
+            className={`keyboard-key ${tecla === 'ENTER' || tecla === 'BACK' ? 'keyboard-key-special' : ''}`}
           >
-            {key}
+            {tecla}
           </button>
         ))}
       </div>

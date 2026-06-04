@@ -1,11 +1,16 @@
 import { Link } from 'react-router-dom'
 
+/** Props para el componente `Header`. Son callbacks que controlan modales/sidebars. */
 interface HeaderProps {
   onOpenSidebar: () => void
   onOpenSettings: () => void
   onOpenStats: () => void
 }
 
+/**
+ * `Header` - Barra superior con logo y accesos a menús.
+ * Recibe handlers externos; no mantiene estado interno.
+ */
 const Header = ({ onOpenSidebar, onOpenSettings, onOpenStats }: HeaderProps) => {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-md px-4 py-4 shadow-sm md:px-6">

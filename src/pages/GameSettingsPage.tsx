@@ -1,11 +1,16 @@
+/**
+ * Página para ajustes globales del juego (game settings).
+ * Proporciona una UI para editar los valores almacenados en Supabase.
+ */
 import { useEffect, useState } from 'react'
 
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 
 import { supabase } from '../lib/supabase'
+import { loadThemeConfig, saveThemeConfig } from '../lib/themeConfig'
 
-function GameSettingsPage() {
+function GameSettingsPage () {
   const [showSidebar, setShowSidebar] =
     useState(false)
 
@@ -15,11 +20,13 @@ function GameSettingsPage() {
   const [secondsPerQuestion, setSecondsPerQuestion] =
     useState(30)
 
+  const savedTheme = loadThemeConfig()
+
   const [backgroundColor, setBackgroundColor] =
-    useState('#0f172a')
+    useState(savedTheme.backgroundColor ?? '#0f172a')
 
   const [fontFamily, setFontFamily] =
-    useState('Inter')
+    useState(savedTheme.fontFamily ?? 'Inter')
 
   const [loading, setLoading] =
     useState(false)
@@ -53,6 +60,11 @@ function GameSettingsPage() {
       setFontFamily(
         data.fontfamily
       )
+
+      saveThemeConfig({
+        backgroundColor: data.backgroundcolor,
+        fontFamily: data.fontfamily,
+      })
     }
 
     loadSettings()
@@ -89,6 +101,11 @@ function GameSettingsPage() {
           return
         }
 
+        saveThemeConfig({
+          backgroundColor,
+          fontFamily,
+        })
+
         alert(
           'Configuración guardada'
         )
@@ -98,7 +115,13 @@ function GameSettingsPage() {
     }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div
+      className="min-h-screen text-slate-900"
+      style={{
+        backgroundColor,
+        fontFamily,
+      }}
+    >
       <Header
         onOpenSidebar={() =>
           setShowSidebar(true)

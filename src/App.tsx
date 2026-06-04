@@ -6,6 +6,8 @@ import SettingsModal from './components/SettingsModal'
 import StatsModal from './components/StatsModal'
 import type { QuestionItem, QuestionSettings, GameSettings } from './types'
 import { supabase } from './lib/supabase'
+import { loadThemeConfig } from './lib/themeConfig'
+import type { ThemeConfig } from './lib/themeConfig'
 
 
 type VisualTheme = 'light' | 'dark' | 'black' | 'blue' | 'sepia'
@@ -14,9 +16,6 @@ const FALLBACK_SETTINGS: QuestionSettings = {
   questionsPerDay: 5,
   secondsPerQuestion: 30,
 }
-
-// LocalStorage donde se guardan las configuraciones personalizadas
-const SETTINGS_STORAGE_KEY_QUESTIONS = 'seonose-custom-settings-questions'
 
 // Flag temporal para usar o no backend
 const use_database = true
@@ -62,162 +61,7 @@ const FALLBACK_QUESTIONS: QuestionItem[] = [
 
 // const QUESTIONS_PER_GAME = 5
 
-const normalizeString = (value?: string) =>
-  (value ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-
-const ensureThreeChoices = (question: QuestionItem) => {
-  const answer = (question.answer ?? '').trim()
-
-  const sourceChoices = Array.from(
-    new Set(
-      (question.choices ?? [])
-        .map((choice) => choice.trim())
-        .filter(Boolean)
-    )
-  )
-
-  if (!sourceChoices.some((choice) => normalizeString(choice) === normalizeString(answer))) {
-    sourceChoices.unshift(answer)
-  }
-
-  const otherChoices = sourceChoices
-    .filter((choice) => normalizeString(choice) !== normalizeString(answer))
-    .slice(0, 2)
-
-  const fallbackDistractors = [
-    'Londres',
-    'Berlín',
-    'Madrid',
-    'Cinco',
-    'Ocho',
-    'Nueve',
-    'Venus',
-    'Júpiter',
-    'Saturno',
-    'Europa',
-    'África',
-    'Rojo',
-    'Verde',
-    'Amarillo',
-  ]
-
-  const paddedChoices = [...otherChoices]
-
-  let padIndex = 0
-
-  while (paddedChoices.length < 2 && padIndex < fallbackDistractors.length) {
-    const distractor = fallbackDistractors[padIndex++]
-
-    if (
-      !paddedChoices.some((choice) => normalizeString(choice) === normalizeString(distractor)) &&
-      normalizeString(distractor) !== normalizeString(answer)
-    ) {
-      paddedChoices.push(distractor)
-    }
-  }
-
-  const finalChoices = [answer, ...paddedChoices].slice(0, 4)
-
-  return {
-    ...question,
-    choices: finalChoices.sort(() => Math.random() - 0.5),
-  }
-}
-const getTodayKey = () => {
-  return new Intl.DateTimeFormat(
-    'en-CA',
-    {
-      timeZone:
-        'America/Argentina/Buenos_Aires',
-    }
-  ).format(new Date())
-}
-
-// Carga configuraciones guardadas o usa defaults
-const loadCustomSettings =
-  (): QuestionSettings => {
-    try {
-      const raw =
-        window.localStorage.getItem(
-          SETTINGS_STORAGE_KEY_QUESTIONS
-        )
-
-      if (!raw) {
-        return FALLBACK_SETTINGS
-      }
-
-      const parsed =
-        JSON.parse(
-          raw
-        ) as Partial<QuestionSettings>
-
-      return {
-        questionsPerDay:
-          Number(
-            parsed.questionsPerDay
-          ) ||
-          FALLBACK_SETTINGS.questionsPerDay,
-
-        secondsPerQuestion:
-          Number(
-            parsed.secondsPerQuestion
-          ) ||
-          FALLBACK_SETTINGS.secondsPerQuestion,
-      }
-    } catch {
-      return FALLBACK_SETTINGS
-    }
-}
-
-const createSeedFromString = (value: string) => {
-  let hash = 0
-
-  for (let i = 0; i < value.length; i += 1) {
-    hash = Math.imul(31, hash) + value.charCodeAt(i)
-  }
-
-  return hash
-}
-
-const shuffleWithSeed = <T,>(items: T[], seedSource: string) => {
-  const shuffled = [...items]
-  const seed = createSeedFromString(seedSource)
-
-  let randomSeed = seed
-
-  const random = () => {
-    randomSeed = Math.imul(randomSeed ^ (randomSeed >>> 15), randomSeed | 1)
-    randomSeed ^= randomSeed + Math.imul(randomSeed ^ (randomSeed >>> 7), randomSeed | 61)
-
-    return ((randomSeed ^ (randomSeed >>> 14)) >>> 0) / 4294967296
-  }
-
-  for (let i = shuffled.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(random() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
-
-  return shuffled
-}
-
-const selectDailyQuestions = (
-  questions: QuestionItem[],
-  dateKey: string,
-  count: number
-) => {
-  // Respeta la cantidad configurada por localStorage
-  const maxQuestions = Math.min(count, questions.length)
-
-  const shuffled = shuffleWithSeed(questions, dateKey)
-
-  return shuffled
-    .slice(0, Math.min(maxQuestions, shuffled.length))
-    .map(ensureThreeChoices)
-}
+import { getTodayKey, loadCustomSettings, selectDailyQuestions } from './lib/appHelpers'
 
 function App() {
   const [showStats, setShowStats] = useState(false)
@@ -246,10 +90,15 @@ function App() {
   const [questionDate, setQuestionDate] = useState<string>(getTodayKey())
   const [settings, setSettings] = useState<QuestionSettings | null>(null)
   const [loading, setLoading] = useState(true)
+  const [themeConfig, setThemeConfig] = useState<ThemeConfig>(() => loadThemeConfig())
 
   useEffect(() => {
     window.localStorage.setItem('seonose-theme', visualTheme)
   }, [visualTheme])
+
+  useEffect(() => {
+    setThemeConfig(loadThemeConfig())
+  }, [])
 
   useEffect(() => {
     if (!gameSettings) {
@@ -286,6 +135,7 @@ function App() {
               choices: string[] | null
               availablefrom?: string
               enabled?: boolean
+              repeatable?: boolean
             }
 
             const questionsData: QuestionItem[] = data.map(
@@ -296,6 +146,7 @@ function App() {
                 choices: item.choices ?? [],
                 availablefrom: item.availablefrom,
                 enabled: item.enabled,
+                repeatable: item.repeatable ?? false,
               })
             )
 
@@ -319,12 +170,12 @@ function App() {
             console.log('GAME SETTINGS FROM SUPABASE:', gameSettings ?? 'No game settings found, using custom/local settings')
             const todayKey = getTodayKey()
 
-            const validQuestions: QuestionItem[] = questionsData
+            const enabledQuestions: QuestionItem[] = questionsData
               .filter(
                 (q) =>
                   typeof q.question === 'string' &&
                   typeof q.answer === 'string' &&
-                  q.enabled && (!q.availablefrom || q.availablefrom.slice(0,10) === todayKey)
+                  q.enabled
               )
               .map((q) => ({
                 id: q.id,
@@ -336,16 +187,19 @@ function App() {
                         typeof choice === 'string'
                     )
                   : [],
+                availablefrom: q.availablefrom,
+                enabled: q.enabled,
+                repeatable: q.repeatable ?? false,
               }))
             console.log('VALID QUESTIONS:')
-            console.log(JSON.stringify(validQuestions, null, 2))
+            console.log(JSON.stringify(enabledQuestions, null, 2))
             setSettings(finalSettings)
-            setAllQuestions(validQuestions)
+            setAllQuestions(enabledQuestions)
             setQuestionDate(todayKey)
 
             setQuestions(
               selectDailyQuestions(
-                validQuestions,
+                enabledQuestions,
                 todayKey,
                 finalSettings.questionsPerDay
               )
@@ -431,9 +285,9 @@ function App() {
     <div
       className="min-h-screen transition-colors duration-300"
       style={{
-        backgroundColor: gameSettings?.backgroundcolor ?? '#f8fafc',
+        backgroundColor: gameSettings?.backgroundcolor ?? themeConfig.backgroundColor ?? '#f8fafc',
 
-        fontFamily: gameSettings?.fontfamily ?? 'sans-serif',
+        fontFamily: gameSettings?.fontfamily ?? themeConfig.fontFamily ?? 'sans-serif',
       }}
     >
       <Header

@@ -5,6 +5,7 @@ export interface QuestionItem {
   choices?: string[]
   availablefrom?: string
   enabled?: boolean
+  repeatable?: boolean
 }
 
 export interface QuestionSettings {

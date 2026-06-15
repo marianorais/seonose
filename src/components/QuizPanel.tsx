@@ -283,20 +283,6 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
         window.open(href, '_blank')
       }
 
-      const shareNative = async (text: string) => {
-        if (navigator.share) {
-          try {
-            await navigator.share({ text })
-          } catch (e) {
-            console.error('Compartir falló', e)
-          }
-        } else {
-          // fallback: open modal
-          setShareText(text)
-          setShareOpen(true)
-        }
-      }
-
       return (
         <>
           <div className="w-full space-y-8">

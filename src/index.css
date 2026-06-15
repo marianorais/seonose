@@ -7,6 +7,13 @@
   color: #0f172a;
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+  height: 100%;
+}
+
 .theme-light {
   background-color: #f8fafc;
   color: #0f172a;
@@ -34,6 +41,11 @@
 
 html {
   scroll-behavior: smooth;
+}
+
+/* Fluid, accessible base font-size to improve readability across devices */
+html {
+  font-size: clamp(13px, 1.4vw, 16px);
 }
 
 body {
@@ -70,6 +82,183 @@ button {
 
   .card-surface {
     @apply rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm;
+  }
+
+  .quiz-panel {
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .quiz-panel h2 {
+    line-height: 1.1;
+  }
+
+  .quiz-panel button {
+    min-height: 4.25rem;
+  }
+
+  @media (max-height: 720px) {
+    .quiz-panel {
+      min-height: calc(100vh - 10rem);
+    }
+
+    .quiz-panel h2 {
+      font-size: 1.55rem;
+    }
+
+    .quiz-panel button {
+      min-height: 3.5rem;
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+    }
+  }
+
+  /* Panel adjustments to fit quiz content within common viewports */
+  .quiz-viewport {
+    min-height: calc(100vh - 72px);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    /* Keep header and timer visible; allow choices to scroll internally */
+    align-items: stretch;
+  }
+
+  .choices-grid {
+    gap: 0.5rem;
+    /* Allow choices to take remaining space and scroll if needed */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  /* Desktop spacing for timer vs choices */
+  .timer-box {
+    margin-bottom: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .timer-box {
+      margin-bottom: 1.25rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .timer-box {
+      margin-bottom: 1.5rem;
+    }
+  }
+
+  .choices-grid button {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+    min-height: 3.6rem;
+    font-size: 0.98rem;
+  }
+
+  .result-card {
+    padding: 0.6rem;
+  }
+
+  .result-card p {
+    font-size: 0.95rem;
+  }
+
+  .action-grid {
+    margin-top: 0.25rem;
+  }
+
+  @media (max-width: 640px) {
+    .quiz-viewport {
+      min-height: calc(100vh - 64px);
+      gap: 0.5rem;
+    }
+
+    .choices-grid button {
+      font-size: 1rem;
+      min-height: 3.8rem;
+      padding-top: 0.7rem;
+      padding-bottom: 0.7rem;
+    }
+  }
+
+  /* Netbook / small laptop adjustments */
+  @media (min-width: 900px) and (max-width: 1280px) {
+    html {
+      font-size: 13px; /* netbooks: slightly smaller base for denser layouts */
+    }
+
+    .quiz-viewport {
+      gap: 0.6rem;
+      padding-bottom: 0.25rem;
+    }
+
+    .quiz-viewport h2 {
+      font-size: 1.1rem;
+      margin-top: 0.25rem;
+    }
+
+    .timer-box {
+      padding-top: 0.4rem;
+      padding-bottom: 0.4rem;
+      padding-left: 0.6rem;
+      padding-right: 0.6rem;
+    }
+
+    .timer-box span {
+      font-size: 1.5rem;
+      padding: 0.3rem 0.6rem;
+    }
+
+    .choices-grid button {
+      font-size: 0.9rem;
+      min-height: 3rem;
+      padding-top: 0.45rem;
+      padding-bottom: 0.45rem;
+      border-radius: 1rem;
+    }
+
+    .choices-grid {
+      gap: 0.45rem;
+    }
+  }
+
+  /* Specific tweaks for very small phones (iPhone SE and similar) */
+  @media (max-width: 375px) {
+    .quiz-viewport {
+      min-height: calc(100vh - 56px);
+      gap: 0.4rem;
+      padding-bottom: 0.25rem;
+    }
+
+    .quiz-viewport h2 {
+      font-size: 1.05rem;
+      margin-top: 0.25rem;
+    }
+
+    .timer-box {
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+      padding-top: 0.45rem;
+      padding-bottom: 0.45rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .choices-grid {
+      gap: 0.4rem;
+    }
+
+    .choices-grid button {
+      font-size: 0.95rem;
+      min-height: 3.2rem;
+      padding-top: 0.45rem;
+      padding-bottom: 0.45rem;
+      border-radius: 1.25rem;
+    }
+
+    .quiz-panel button {
+      min-height: 3rem;
+    }
   }
 }
 

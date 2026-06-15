@@ -336,23 +336,24 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
     }
 
     return (
-      <div className="w-full space-y-6">
+      <div className="w-full space-y-6 quiz-viewport">
         <div className="text-center max-w-4xl mx-auto">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Pregunta {currentIndex + 1} de {questions.length}</p>
-          <h2 className="mt-3 text-2xl font-bold text-slate-900 sm:text-3xl">{currentQuestion?.question}</h2>
+          <h2 className="mt-2 text-xl font-bold text-slate-900 sm:text-3xl">{currentQuestion?.question}</h2>
         </div>
 
-        <div className="flex flex-col gap-3 rounded-[2rem] bg-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative">
+        <div className="flex flex-col gap-2 rounded-[2rem] bg-slate-100 px-4 py-3 timer-box sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm font-semibold text-slate-700">Tiempo restante</span>
-          <span className="rounded-[1.5rem] bg-white px-4 py-3 text-3xl font-bold text-slate-900 shadow-sm">{secondsLeft}</span>
+          <span className="rounded-[1.5rem] bg-white px-3 py-2 text-2xl font-bold text-slate-900 shadow-sm">{secondsLeft}</span>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2 choices-grid">
           {currentQuestion.choices?.map((choice) => {
             const isSelected = normalizar(choice) === normalizar(tempAnswer)
 
             return (
-              <button key={choice} type="button" onClick={() => handleChoice(choice)} disabled={showFeedback} className={`rounded-[1.75rem] border px-5 py-5 text-left text-base font-semibold leading-6 transition ${isSelected ? 'border-sky-600 bg-sky-50 text-slate-900 shadow-sm' : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50'} min-h-[5rem] ${showFeedback ? 'cursor-not-allowed opacity-50' : ''}`}>
+              <button key={choice} type="button" onClick={() => handleChoice(choice)} disabled={showFeedback} className={`rounded-[1.75rem] border px-4 py-3 text-left text-base font-semibold leading-6 transition ${isSelected ? 'border-sky-600 bg-sky-50 text-slate-900 shadow-sm' : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50'} min-h-[3.6rem] ${showFeedback ? 'cursor-not-allowed opacity-50' : ''}`}>
                 {choice}
               </button>
             )
@@ -372,6 +373,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
             </div>
           </div>
         )}
+        </div>
       </div>
     )
   }

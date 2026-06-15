@@ -296,9 +296,9 @@ function App() {
         onOpenStats={() => setShowStats(true)}
       />
 
-      <main className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center px-4 py-8 lg:px-8">
+      <main className="mx-auto flex w-full max-w-3xl flex-col items-center justify-start px-4 py-5 lg:px-8">
         {loading ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-600">
+          <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600">
             Cargando contenido...
           </div>
         ) : (

@@ -8,7 +8,7 @@ const ShareModal = ({ isOpen, onClose, shareText }: ShareModalProps) => {
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(shareText)
-      alert('Texto copiado al portapapeles')
+      alert('Texto copiado')
     } catch {
       alert('No se pudo copiar el texto. Usa Ctrl+C manualmente.')
     }

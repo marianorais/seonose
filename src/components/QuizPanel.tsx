@@ -62,6 +62,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
 
     const [shareOpen, setShareOpen] = useState<boolean>(false)
     const [shareText, setShareText] = useState<string>('')
+    const [copiedToast, setCopiedToast] = useState<boolean>(false)
 
     const [questionStartTime, setQuestionStartTime] = useState<number>(() => Date.now())
     const [showFeedback, setShowFeedback] = useState<boolean>(savedState?.showFeedback ?? false)
@@ -264,24 +265,79 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
       const correctCount = answers.filter((a) => a.isCorrect).length
       const totalResponseTime = answers.reduce((sum, a) => sum + a.responseTime, 0)
       const averageResponseTime = answers.length > 0 ? Math.round(totalResponseTime / answers.length) : 0
+      const shareSummary = `🧠 Se o NoSe #${gameNumber} ${correctCount}/${answers.length} 👉 ${window.location.origin}`
+
+      const copyToClipboard = async (text: string) => {
+        try {
+          await navigator.clipboard.writeText(text)
+          setCopiedToast(true)
+          window.setTimeout(() => setCopiedToast(false), 2000)
+        } catch (e) {
+          console.error('No se pudo copiar', e)
+        }
+      }
+
+      const shareViaWhatsApp = (text: string) => {
+        const encoded = encodeURIComponent(text)
+        const href = `https://wa.me/?text=${encoded}`
+        window.open(href, '_blank')
+      }
+
+      const shareNative = async (text: string) => {
+        if (navigator.share) {
+          try {
+            await navigator.share({ text })
+          } catch (e) {
+            console.error('Compartir falló', e)
+          }
+        } else {
+          // fallback: open modal
+          setShareText(text)
+          setShareOpen(true)
+        }
+      }
 
       return (
         <>
           <div className="w-full space-y-8">
             <div className="flex flex-col gap-4 rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">Resultados</p>
-                <h2 className="mt-3 text-3xl font-bold text-gray-900">{correctCount} de {answers.length} correctas</h2>
-                <p className="mt-1 text-sm text-gray-600">Tiempo promedio por respuesta: {averageResponseTime} s</p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">Resultados</p>
+                  <h2 className="mt-3 text-3xl font-bold text-gray-900">{correctCount} de {answers.length} correctas</h2>
+                  <p className="mt-1 text-sm text-gray-600">Tiempo promedio por respuesta: {averageResponseTime} s</p>
+                </div>
+
+                <div className="flex items-center gap-2 mt-2">
+                  <button type="button" aria-label="Compartir por WhatsApp" onClick={() => shareViaWhatsApp(shareSummary)} className="p-2 rounded-full bg-[#25D366] text-white shadow-sm" title="Compartir por WhatsApp">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.149-.672.15-.2.297-.772.967-.945 1.165-.173.2-.347.224-.644.075-.297-.15-1.255-.462-2.39-1.475-.885-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.131-.606.135-.134.298-.347.447-.52.15-.174.2-.298.3-.497.099-.2.05-.373-.025-.522-.075-.149-.672-1.62-.921-2.224-.242-.58-.487-.5-.672-.51l-.57-.01c-.2 0-.523.075-.797.373s-1.04 1.016-1.04 2.479 1.064 2.876 1.213 3.074c.149.2 2.095 3.2 5.077 4.487.709.306 1.26.489 1.693.626.712.226 1.36.194 1.872.118.571-.085 1.758-.718 2.007-1.411.248-.693.248-1.287.173-1.411-.074-.124-.272-.198-.57-.347z" fill="#fff"/>
+                    </svg>
+                  </button>
+
+                  <button type="button" aria-label="Copiar resultado" onClick={() => copyToClipboard(shareSummary)} className="p-2 rounded-full bg-white border border-slate-200 text-slate-900 shadow-sm" title="Copiar resultado">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                      <path d="M16 1H4a2 2 0 00-2 2v12h2V3h12V1z" fill="#111827"/>
+                      <path d="M20 5H8a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2zm0 16H8V7h12v14z" fill="#111827"/>
+                    </svg>
+                  </button>
+
+                  <button type="button" aria-label="Más opciones" onClick={() => { setShareText(shareSummary); setShareOpen(true); }} className="p-2 rounded-full bg-white border border-slate-200 text-slate-900 shadow-sm" title="Más opciones">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                      <path d="M12 5c.69 0 1.25-.56 1.25-1.25S12.69 2.5 12 2.5 10.75 3.06 10.75 3.75 11.31 5 12 5zM12 13c.69 0 1.25-.56 1.25-1.25S12.69 10.5 12 10.5 10.75 11.06 10.75 11.75 11.31 13 12 13zM12 21c.69 0 1.25-.56 1.25-1.25S12.69 18.5 12 18.5 10.75 19.06 10.75 19.75 11.31 21 12 21z" fill="#111827"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
 
-              <div className="rounded-3xl bg-gray-900 px-5 py-4 text-right text-white sm:text-left">
-                <p className="text-xs uppercase tracking-widest text-slate-300">Próxima reiteración</p>
-                <p className="mt-2 text-4xl font-bold">{remainingText}</p>
-              </div>
+                <div className="rounded-3xl bg-gray-900 px-5 py-4 text-right text-white sm:text-left">
+                  <p className="text-xs uppercase tracking-widest text-slate-300">Próxima reiteración</p>
+                  <p className="mt-2 text-4xl font-bold">{remainingText}</p>
+                </div>
             </div>
 
-            <div className="space-y-4">
+              {/* Prominent share actions: WhatsApp, copy, native share */}
+              <div className="space-y-4">
               {answers.map((answerItem, index) => {
                 const answerOptions = getResultOptions(answerItem)
 
@@ -331,6 +387,10 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
           </div>
 
           <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} shareText={shareText} />
+
+          {copiedToast && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-full bg-slate-900 px-4 py-2 text-sm text-white shadow">Texto copiado</div>
+          )}
         </>
       )
     }

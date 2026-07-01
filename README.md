@@ -65,7 +65,7 @@ dist
 
 7. Despliega.
 
-## 📍 Deploy en Netlify
+## 📍 Deploy en SUPERBASE
 
 1. Conecta el repositorio en Netlify.
 2. En `Build command` escribe:

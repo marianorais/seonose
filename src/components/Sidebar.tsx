@@ -1,39 +1,4 @@
-const sections = [
-  {
-    title: 'Modos de juego',
-    items: [
-      { label: 'Normal', href: '/' },
-      { label: 'Frase', href: '/frase' },
-      { label: 'Países', href: '/paises' },
-      { label: 'Pasaporte', href: '/paises/pasaporte' },
-      { label: 'Raíz', href: '/raiz' },
-      { label: 'Tildes', href: '/tildes' },
-      { label: 'Científica', href: '/ciencia' },
-      { label: 'Contrarreloj', href: '/contrarreloj' },
-      { label: 'Medallero', href: '/medallero' },
-      { label: 'Crear', href: '/crear' },
-    ],
-  },
-  {
-    title: 'Archivo',
-    items: [
-      { label: 'Archivo Normal', href: '/archivo/normal' },
-      { label: 'Archivo Países', href: '/archivo/paises' },
-      { label: 'Archivo Tildes', href: '/archivo/tildes' },
-      { label: 'Archivo Científico', href: '/archivo/ciencia' },
-      { label: 'Archivo Frase', href: '/archivo/frase' },
-      { label: 'Archivo Raíz', href: '/archivo/raiz' },
-    ],
-  },
-  {
-    title: 'Información',
-    items: [
-      { label: 'Cómo jugar', href: '/como-jugar' },
-      { label: 'Cómo jugar - Frase', href: '/como-jugar-frase' },
-      { label: 'Cómo jugar - Países', href: '/como-jugar-paises' },
-    ],
-  },
-]
+import { Link } from 'react-router-dom'
 
 interface SidebarProps {
   isOpen: boolean
@@ -55,23 +20,26 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         </div>
 
         <div className="space-y-6 p-4">
-          {sections.map((section) => (
-            <div key={section.title} className="space-y-3">
-              <h3 className="text-xs uppercase tracking-widest text-gray-500">{section.title}</h3>
-              <div className="space-y-2">
-                {section.items.map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    disabled
-                    className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-left text-sm text-gray-500 opacity-70 transition"
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
+          <div className="space-y-3">
+            <h3 className="text-xs uppercase tracking-widest text-gray-500">Navegación</h3>
+            <div className="space-y-2">
+              <Link
+                to="/"
+                onClick={onClose}
+                className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm font-medium text-gray-800 transition hover:bg-gray-50"
+              >
+                🏠 Inicio
+              </Link>
             </div>
-          ))}
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xs uppercase tracking-widest text-gray-500">Sobre el juego</h3>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+              <p>Se o NoSe es un juego de preguntas diarias para poner a prueba cuánto sabés.</p>
+              <p className="mt-2">Nuevas preguntas todos los días. ¡Compartilo y competí con tus amigos!</p>
+            </div>
+          </div>
         </div>
       </div>
     </>

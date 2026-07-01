@@ -27,7 +27,7 @@ const Header = ({ onOpenSidebar, onOpenSettings, onOpenStats }: HeaderProps) => 
         <div className="flex flex-1 items-center justify-center text-center">
           <Link to="/">
             <img
-              src={new URL('../assets/logo.jpg', import.meta.url).href}
+              src={new URL('../assets/logo.png', import.meta.url).href}
               alt="Logo de la aplicación"
               className="h-20 w-auto cursor-pointer object-contain transition hover:opacity-90"
             />

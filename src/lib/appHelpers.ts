@@ -129,6 +129,14 @@ export const shuffleWithSeed = <T,>(items: T[], seedSource: string) => {
 }
 
 export const selectDailyQuestions = (questions: QuestionItem[], dateKey: string, count: number) => {
+  // Elimina duplicados por id en la fuente para que nunca aparezca
+  // la misma pregunta dos veces (ni en el juego ni en los resultados).
+  const uniqueById = Array.from(
+    new Map(questions.map((question) => [question.id, question])).values()
+  )
+
+  questions = uniqueById
+
   const dailyQuestions = questions.filter(
     (question) =>
       question.enabled &&

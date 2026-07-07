@@ -3,7 +3,7 @@
  * No cambian la lógica de negocio; solo agrupan funciones para mejorar modularidad.
  */
 
-export const GAME_START_DATE = '2026-05-01'
+export const GAME_START_DATE = '2026-07-07'
 
 export const CLAVE_ESTADO_QUIZ = 'seonose-quiz-state'
 export const CLAVE_HISTORIAL_RESULTADOS = 'seonose-results-history'
@@ -16,7 +16,11 @@ export const normalizar = (value?: string) =>
     .trim()
 
 export const obtenerNumeroPartida = () => {
-  const start = new Date(GAME_START_DATE)
+  // Parseamos GAME_START_DATE como fecha local (no UTC) para evitar
+  // corrimientos de un día en zonas horarias negativas (ej. Argentina).
+  const [year, month, day] = GAME_START_DATE.split('-').map(Number)
+  const start = new Date(year, month - 1, day)
+
   const today = new Date()
 
   start.setHours(0, 0, 0, 0)

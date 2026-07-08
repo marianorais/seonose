@@ -33,7 +33,12 @@ const StatsModal = ({ onClose }: StatsModalProps) => {
   }, [])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
       <div className="w-full max-w-xl rounded-[2rem] border border-slate-200 bg-white p-5 shadow-xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>

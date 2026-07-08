@@ -56,16 +56,21 @@ export const formatearTiempoRestante = (target: Date) => {
     .padStart(2, '0')}`
 }
 
-export const cargarEstadoGuardado = <T = any>() => {
+export const cargarEstadoGuardado = <T = any>(expectedDayKey?: string) => {
   try {
     const raw = window.localStorage.getItem(CLAVE_ESTADO_QUIZ)
 
     if (!raw) return null
 
-    const parsed = JSON.parse(raw) as T & { gameNumber?: number }
+    const parsed = JSON.parse(raw) as T & { gameNumber?: number; dayKey?: string }
 
-    // Si pertenece a otra partida, se invalida
-    if (parsed.gameNumber !== undefined && parsed.gameNumber !== obtenerNumeroPartida()) {
+    if (parsed.dayKey !== undefined) {
+      // Formato nuevo: se valida por día (mismo criterio que el reset diario).
+      if (expectedDayKey !== undefined && parsed.dayKey !== expectedDayKey) {
+        return null
+      }
+    } else if (parsed.gameNumber !== undefined && parsed.gameNumber !== obtenerNumeroPartida()) {
+      // Compatibilidad con estados guardados antes de incluir dayKey.
       return null
     }
 

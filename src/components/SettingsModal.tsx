@@ -6,8 +6,8 @@ interface SettingsModalProps {
   isOpen: boolean
   onClose: () => void
   settings: QuestionSettings | null
-  visualTheme: VisualTheme
-  onChangeTheme: (theme: VisualTheme) => void
+  visualTheme?: VisualTheme
+  onChangeTheme?: (theme: VisualTheme) => void
 }
 
 const SettingsModal = ({ isOpen, onClose, settings }: SettingsModalProps) => {
@@ -22,7 +22,12 @@ const SettingsModal = ({ isOpen, onClose, settings }: SettingsModalProps) => {
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Escape' && onClose()}
       />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose()
+        }}
+      >
         <div className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-3xl max-h-[90vh] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_35px_90px_rgba(15,23,42,0.15)]" style={{ height: '-webkit-fill-available' }}>
           <div className="relative border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5 text-center">
             <h2 className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Ajustes</h2>

@@ -11,6 +11,9 @@ import './index.css'
 import App from './App.tsx'
 import AdminPreguntasPage from './pages/PanelAdministracionPreguntas.tsx'
 import GameSettingsPage from './pages/GameSettingsPage.tsx'
+import EstadisticasPage from './pages/EstadisticasPage.tsx'
+import ContactoPage from './pages/ContactoPage.tsx'
+import MejorasPage from './pages/MejorasPage.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -32,6 +35,18 @@ createRoot(document.getElementById('root')!).render(
         <Route
           path="/configuraciones"
           element={<GameSettingsPage />}
+        />
+        <Route
+          path="/estadisticas"
+          element={<EstadisticasPage />}
+        />
+        <Route
+          path="/contacto"
+          element={<ContactoPage />}
+        />
+        <Route
+          path="/mejoras"
+          element={<MejorasPage />}
         />
       </Routes>
     </BrowserRouter>

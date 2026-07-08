@@ -40,6 +40,18 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               <p className="mt-2">Nuevas preguntas todos los días. ¡Compartilo y competí con tus amigos!</p>
             </div>
           </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xs uppercase tracking-widest text-gray-500">Contacto</h3>
+            <Link
+              to="/contacto"
+              onClick={onClose}
+              className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm font-medium text-gray-800 transition hover:bg-gray-50"
+            >
+              ✉️ Contáctenos
+            </Link>
+            <p className="text-xs text-gray-500">Envianos tus sugerencias de mejora.</p>
+          </div>
         </div>
       </div>
     </>

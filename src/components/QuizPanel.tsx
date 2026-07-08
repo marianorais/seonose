@@ -25,6 +25,7 @@ type SavedQuizState = {
   answer?: string
   isTimeout?: boolean
   gameNumber?: number
+  dayKey?: string
 }
 
 interface Answer {
@@ -49,7 +50,7 @@ interface QuizPanelProps {
  * original, solo se ha modularizado el código.
  */
 const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanelProps) => {
-    const savedState = typeof window !== 'undefined' ? cargarEstadoGuardado<SavedQuizState>() : null
+    const savedState = typeof window !== 'undefined' ? cargarEstadoGuardado<SavedQuizState>(questionDate) : null
 
     const gameNumber = useMemo(() => obtenerNumeroPartida(), [])
 
@@ -74,6 +75,8 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
     // Evita que un doble click (o una reentrada durante el guardado async)
     // agregue dos respuestas para la misma pregunta.
     const advancingRef = useRef<boolean>(false)
+    // Último estado con progreso, para persistirlo al ocultar/descargar la página.
+    const latestSnapshotRef = useRef<SavedQuizState | null>(null)
 
     const currentQuestion = useMemo(() => questions[currentIndex], [questions, currentIndex])
 
@@ -199,7 +202,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
     }, [currentIndex])
 
     useEffect(() => {
-      guardarEstadoQuiz({
+      const snapshot: SavedQuizState = {
         currentIndex,
         secondsLeft,
         answer: tempAnswer,
@@ -207,10 +210,53 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
         finished,
         nextIteration: nextIteration.toISOString(),
         gameNumber,
+        dayKey: questionDate,
         showFeedback,
         isTimeout,
-      })
-    }, [currentIndex, secondsLeft, answers, finished, nextIteration, gameNumber, showFeedback, tempAnswer, isTimeout])
+      }
+
+      // Estado "pristino": partida recién iniciada o reseteada, sin nada que
+      // preservar. No lo persistimos para no pisar un estado con progreso ya
+      // guardado (causa del reinicio ocasional al refrescar).
+      const sinProgreso =
+        !finished &&
+        !showFeedback &&
+        !isTimeout &&
+        currentIndex === 0 &&
+        answers.length === 0 &&
+        tempAnswer === ''
+
+      if (sinProgreso) {
+        latestSnapshotRef.current = null
+        return
+      }
+
+      latestSnapshotRef.current = snapshot
+      guardarEstadoQuiz(snapshot)
+    }, [currentIndex, secondsLeft, answers, finished, nextIteration, gameNumber, questionDate, showFeedback, tempAnswer, isTimeout])
+
+    // Persiste el último estado con progreso justo antes de que la página se
+    // oculte o se descargue (refresh, cierre, cambio de pestaña), cerrando la
+    // ventana en la que un cambio reciente podría no haberse guardado.
+    useEffect(() => {
+      const flush = () => {
+        if (latestSnapshotRef.current) {
+          guardarEstadoQuiz(latestSnapshotRef.current)
+        }
+      }
+
+      const onVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') flush()
+      }
+
+      window.addEventListener('pagehide', flush)
+      document.addEventListener('visibilitychange', onVisibilityChange)
+
+      return () => {
+        window.removeEventListener('pagehide', flush)
+        document.removeEventListener('visibilitychange', onVisibilityChange)
+      }
+    }, [])
 
     const handleNext = async () => {
       if (!currentQuestion || !showFeedback) return
@@ -238,8 +284,14 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
       const nextIndex = currentIndex + 1
 
       if (nextIndex >= questions.length) {
-        guardarResultadoEnHistorial(nextAnswers)
-        await saveCompletedGame(nextAnswers)
+        // Registrar la partida una sola vez, aunque se re-entre a este bloque
+        // (doble click o refresh durante el guardado async). Evita sesiones y
+        // respuestas duplicadas en la base.
+        if (!finishRecordedRef.current) {
+          finishRecordedRef.current = true
+          guardarResultadoEnHistorial(nextAnswers)
+          await saveCompletedGame(nextAnswers)
+        }
         setFinished(true)
         return
       }
@@ -260,11 +312,22 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
 
     const handleRetry = () => resetQuiz()
 
-    const handleShareOpen = () => {
+    // Texto que se comparte: incluye una barra de cuadraditos (🟩 acierto /
+    // 🟥 error) en el orden real en que se respondieron las preguntas.
+    const construirTextoResultado = () => {
       const correctCount = answers.filter((a) => a.isCorrect).length
       const total = answers.length
-      const text = [`🧠 Se o NoSe #${gameNumber} ${correctCount}/${total}`, `👉 ${window.location.origin}`].join('\n')
-      setShareText(text)
+      const barra = answers.map((a) => (a.isCorrect ? '🟩' : '🟥')).join('')
+
+      return [
+        `🧠 Se o NoSe #${gameNumber} ${correctCount}/${total}`,
+        barra,
+        `👉 ${window.location.origin}`,
+      ].join('\n')
+    }
+
+    const handleShareOpen = () => {
+      setShareText(construirTextoResultado())
       setShareOpen(true)
     }
 
@@ -276,7 +339,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
       const correctCount = answers.filter((a) => a.isCorrect).length
       const totalResponseTime = answers.reduce((sum, a) => sum + a.responseTime, 0)
       const averageResponseTime = answers.length > 0 ? Math.round(totalResponseTime / answers.length) : 0
-      const shareSummary = `🧠 Se o NoSe #${gameNumber} ${correctCount}/${answers.length} 👉 ${window.location.origin}`
+      const shareSummary = construirTextoResultado()
 
       const copyToClipboard = async (text: string) => {
         try {
@@ -302,6 +365,11 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">Resultados</p>
                   <h2 className="mt-3 text-3xl font-bold text-gray-900">{correctCount} de {answers.length} correctas</h2>
+                  <p className="mt-2 text-lg tracking-wide" aria-label={`${correctCount} de ${answers.length} correctas`}>
+                    {answers.map((a, index) => (
+                      <span key={index}>{a.isCorrect ? '🟩' : '🟥'}</span>
+                    ))}
+                  </p>
                   <p className="mt-1 text-sm text-gray-600">Tiempo promedio por respuesta: {averageResponseTime} s</p>
                 </div>
 

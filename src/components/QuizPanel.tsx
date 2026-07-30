@@ -373,29 +373,37 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
                   <p className="mt-1 text-sm text-gray-600">Tiempo promedio por respuesta: {averageResponseTime} s</p>
                 </div>
 
-                <div className="flex items-center gap-2 mt-2">
-                  <button type="button" aria-label="Compartir por WhatsApp" onClick={() => shareViaWhatsApp(shareSummary)} className="p-2 rounded-full bg-[#25D366] text-white shadow-sm" title="Compartir por WhatsApp">
+                <div className="mt-2 flex flex-nowrap items-center gap-2">
+                  <button
+                    id="btnTresPuntos"
+                    type="button"
+                    aria-label="Compartir resultado"
+                    onClick={() => {
+                      setShareText(shareSummary)
+                      setShareOpen(true)
+                    }}
+                    className="inline-flex h-10 items-center justify-center rounded-full bg-[#25D366] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1fb15b]"
+                    title="Compartir resultado"
+                  >
+                    Compartir
+                  </button>
+
+                  <button type="button" aria-label="Compartir por WhatsApp" onClick={() => shareViaWhatsApp(shareSummary)} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm" title="Compartir por WhatsApp">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg" aria-hidden>
                       <path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.867-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.247-.694.247-1.289.173-1.413z"/>
                     </svg>
                   </button>
 
-                  <button type="button" aria-label="Copiar resultado" onClick={() => copyToClipboard(shareSummary)} className="p-2 rounded-full bg-white border border-slate-200 text-slate-900 shadow-sm" title="Copiar resultado">
+                  <button type="button" aria-label="Copiar resultado" onClick={() => copyToClipboard(shareSummary)} className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm" title="Copiar resultado">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
                       <path d="M16 1H4a2 2 0 00-2 2v12h2V3h12V1z" fill="#111827"/>
                       <path d="M20 5H8a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2zm0 16H8V7h12v14z" fill="#111827"/>
                     </svg>
                   </button>
-
-                  <button type="button" aria-label="Más opciones" onClick={() => { setShareText(shareSummary); setShareOpen(true); }} className="p-2 rounded-full bg-white border border-slate-200 text-slate-900 shadow-sm" title="Más opciones">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                      <path d="M12 5c.69 0 1.25-.56 1.25-1.25S12.69 2.5 12 2.5 10.75 3.06 10.75 3.75 11.31 5 12 5zM12 13c.69 0 1.25-.56 1.25-1.25S12.69 10.5 12 10.5 10.75 11.06 10.75 11.75 11.31 13 12 13zM12 21c.69 0 1.25-.56 1.25-1.25S12.69 18.5 12 18.5 10.75 19.06 10.75 19.75 11.31 21 12 21z" fill="#111827"/>
-                    </svg>
-                  </button>
                 </div>
               </div>
 
-                <div className="rounded-3xl bg-gray-900 px-5 py-4 text-right text-white sm:text-left">
+                <div className="flex min-w-[180px] flex-col justify-center rounded-3xl bg-gray-900 px-5 py-4 text-right text-white sm:text-left">
                   <p className="text-xs uppercase tracking-widest text-slate-300">Próxima reiteración</p>
                   <p className="mt-2 text-4xl font-bold">{remainingText}</p>
                 </div>

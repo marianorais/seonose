@@ -14,6 +14,7 @@ import {
   limpiarEstadoQuiz,
   guardarResultadoEnHistorial,
 } from '../lib/quizHelpers'
+import { getCategoryMeta } from '../lib/categoryHelpers'
 
 type SavedQuizState = {
   currentIndex?: number
@@ -331,6 +332,22 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
       setShareOpen(true)
     }
 
+    const renderCategoryBadge = (question: QuestionItem | undefined) => {
+      if (!question) return null
+
+      const categoryMeta = getCategoryMeta(question.categoryId, question.categoryName, question.categoryIcon)
+
+      return (
+        <span
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-transparent text-base shadow-none"
+          title={categoryMeta.name}
+          aria-label={categoryMeta.name}
+        >
+          <span aria-hidden="true">{categoryMeta.icon}</span>
+        </span>
+      )
+    }
+
     if (!settings || questions.length === 0) {
       return <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-600">Cargando preguntas...</div>
     }
@@ -417,7 +434,13 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
                 return (
                   <div key={index} className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
                     <p className="text-sm font-semibold text-gray-600">Pregunta {index + 1}</p>
-                    <p className="mt-2 text-base leading-7 text-gray-900">{answerItem.question}</p>
+                    <div className="mt-2 flex items-start gap-3">
+                      {(() => {
+                        const question = questions.find((item) => item.id === answerItem.questionId)
+                        return renderCategoryBadge(question)
+                      })()}
+                      <p className="text-base leading-7 text-gray-900">{answerItem.question}</p>
+                    </div>
 
                     <div className="mt-4 space-y-4">
                       <div className="rounded-3xl bg-slate-50 p-4 text-sm">
@@ -470,9 +493,12 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
 
     return (
       <div className="w-full space-y-6 quiz-viewport">
-        <div className="text-center max-w-4xl mx-auto">
+        <div className="mx-auto w-full max-w-4xl text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Pregunta {currentIndex + 1} de {questions.length}</p>
-          <h2 className="mt-2 text-xl font-bold text-slate-900 sm:text-3xl">{currentQuestion?.question}</h2>
+          <div className="mt-3 flex items-start justify-center gap-3">
+            {renderCategoryBadge(currentQuestion)}
+            <h2 className="text-xl font-bold leading-tight text-slate-900 sm:text-3xl">{currentQuestion?.question}</h2>
+          </div>
         </div>
 
         <div className="relative">

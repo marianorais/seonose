@@ -6,6 +6,9 @@ export interface QuestionItem {
   availablefrom?: string
   enabled?: boolean
   repeatable?: boolean
+  categoryId?: number | null
+  categoryName?: string | null
+  categoryIcon?: string | null
 }
 
 export interface QuestionSettings {

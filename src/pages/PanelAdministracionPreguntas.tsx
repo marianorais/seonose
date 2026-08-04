@@ -14,6 +14,7 @@ import { loadThemeConfig } from '../lib/themeConfig'
 import type { QuestionSettings } from '../types'
 
 import { supabase } from '../lib/supabase'
+import { getCategoryMeta, QUESTION_CATEGORY_OPTIONS } from '../lib/categoryHelpers'
 
 type VisualTheme =
   | 'light'
@@ -30,6 +31,8 @@ interface QuestionAdminItem {
   availablefrom: string
   enabled: boolean
   repeatable: boolean
+  categoryId?: number | null
+  categoryName?: string | null
 }
 
 const tomorrow = () => {
@@ -113,6 +116,8 @@ function AdminPreguntasPage() {
 
   const [repeatable, setRepeatable] =
     useState(false)
+  const [categoryId, setCategoryId] =
+    useState<number | null>(null)
 
   const [loading, setLoading] =
     useState(false)
@@ -167,6 +172,11 @@ function AdminPreguntasPage() {
             availablefrom: string
             enabled: boolean
             repeatable?: boolean
+            categoryId?: number | null
+            categoryid?: number | null
+            category_id?: number | null
+            categoryName?: string | null
+            categoryname?: string | null
           }) => ({
             id: item.id,
             question:
@@ -182,6 +192,10 @@ function AdminPreguntasPage() {
               item.enabled,
             repeatable:
               item.repeatable ?? false,
+            categoryId:
+              item.categoryId ?? item.categoryid ?? item.category_id ?? null,
+            categoryName:
+              item.categoryName ?? item.categoryname ?? null,
           })
         )
 
@@ -259,6 +273,9 @@ function AdminPreguntasPage() {
     setRepeatable(
       questionItem.repeatable ?? false
     )
+    setCategoryId(
+      questionItem.categoryId ?? null
+    )
 
     window.scrollTo({
       top: 0,
@@ -282,6 +299,7 @@ function AdminPreguntasPage() {
     )
 
     setRepeatable(false)
+    setCategoryId(null)
   }
 
   const resetFilters = () => {
@@ -332,6 +350,8 @@ function AdminPreguntasPage() {
 
                 repeatable,
 
+                categoryId,
+
                 enabled: true,
               })
               .eq(
@@ -355,6 +375,8 @@ function AdminPreguntasPage() {
                 availablefrom,
 
                 repeatable,
+
+                categoryId,
 
                 enabled: true,
               })
@@ -709,19 +731,44 @@ function AdminPreguntasPage() {
               />
             </div>
 
-            <div className="flex items-center gap-3">
-              <input
-                id="repeatable"
-                type="checkbox"
-                checked={repeatable}
-                onChange={(event) =>
-                  setRepeatable(event.target.checked)
-                }
-                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-              />
-              <label htmlFor="repeatable" className="text-sm font-medium">
-                Pregunta repetible
-              </label>
+            <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+              <div>
+                <label className="mb-2 block text-sm font-medium">
+                  Categoría
+                </label>
+
+                <select
+                  value={categoryId ?? ''}
+                  onChange={(event) => setCategoryId(event.target.value === '' ? null : Number(event.target.value))}
+                  className={`w-full rounded-xl border px-4 py-3 outline-none transition ${
+                    visualTheme === 'black' || visualTheme === 'dark'
+                      ? 'border-slate-700 bg-slate-950 text-white focus:border-white'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-slate-900'
+                  }`}
+                >
+                  <option value="">Sin categoría</option>
+                  {QUESTION_CATEGORY_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  id="repeatable"
+                  type="checkbox"
+                  checked={repeatable}
+                  onChange={(event) =>
+                    setRepeatable(event.target.checked)
+                  }
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                />
+                <label htmlFor="repeatable" className="text-sm font-medium">
+                  Pregunta repetible
+                </label>
+              </div>
             </div>
 
             {success && (
@@ -857,11 +904,18 @@ function AdminPreguntasPage() {
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className="space-y-2">
-                    <p className="text-lg font-semibold">
-                      {
-                        item.question
-                      }
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-lg font-semibold">
+                        {
+                          item.question
+                        }
+                      </p>
+
+                      <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${getCategoryMeta(item.categoryId, item.categoryName).badgeClassName}`}>
+                        <span aria-hidden="true">{getCategoryMeta(item.categoryId, item.categoryName).icon}</span>
+                        <span>{getCategoryMeta(item.categoryId, item.categoryName).name}</span>
+                      </span>
+                    </div>
 
                     <p className="text-sm opacity-70">
                       Fecha:{' '}

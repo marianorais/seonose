@@ -493,11 +493,13 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
 
     return (
       <div className="w-full space-y-6 quiz-viewport">
-        <div className="mx-auto w-full max-w-4xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Pregunta {currentIndex + 1} de {questions.length}</p>
-          <div className="mt-3 flex items-start justify-center gap-3">
-            {renderCategoryBadge(currentQuestion)}
-            <h2 className="text-xl font-bold leading-tight text-slate-900 sm:text-3xl">{currentQuestion?.question}</h2>
+        <div className="mx-auto w-full max-w-4xl">
+          <div className="flex flex-col items-center text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Pregunta {currentIndex + 1} de {questions.length}</p>
+            <div className="mt-3 flex items-center justify-center gap-3">
+              {renderCategoryBadge(currentQuestion)}
+              <h2 className="text-xl font-bold leading-tight text-slate-900 sm:text-3xl text-center">{currentQuestion?.question}</h2>
+            </div>
           </div>
         </div>
 

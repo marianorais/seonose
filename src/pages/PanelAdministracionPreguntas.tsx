@@ -905,14 +905,17 @@ function AdminPreguntasPage() {
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-2xl leading-none text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+                        {getCategoryMeta(item.categoryId, item.categoryName).icon}
+                      </span>
+
                       <p className="text-lg font-semibold">
                         {
                           item.question
                         }
                       </p>
 
-                      <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${getCategoryMeta(item.categoryId, item.categoryName).badgeClassName}`}>
-                        <span aria-hidden="true">{getCategoryMeta(item.categoryId, item.categoryName).icon}</span>
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${getCategoryMeta(item.categoryId, item.categoryName).badgeClassName}`}>
                         <span>{getCategoryMeta(item.categoryId, item.categoryName).name}</span>
                       </span>
                     </div>

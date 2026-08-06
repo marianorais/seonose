@@ -514,7 +514,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
             const isSelected = normalizar(choice) === normalizar(tempAnswer)
 
             return (
-              <button key={choice} type="button" onClick={() => handleChoice(choice)} disabled={showFeedback} className={`rounded-[1.75rem] border px-4 py-3 text-left text-base font-semibold leading-6 transition ${isSelected ? 'border-sky-600 bg-sky-50 text-slate-900 shadow-sm' : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50'} min-h-[3.6rem] ${showFeedback ? 'cursor-not-allowed opacity-50' : ''}`}>
+              <button key={choice} type="button" onClick={() => handleChoice(choice)} disabled={showFeedback} style={{ fontSize: '1.125rem' }} className={`rounded-[1.75rem] border px-4 py-3 text-left text-base font-semibold leading-6 transition ${isSelected ? 'border-sky-600 bg-sky-50 text-slate-900 shadow-sm' : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50'} min-h-[3.6rem] ${showFeedback ? 'cursor-not-allowed opacity-50' : ''}`}>
                 {choice}
               </button>
             )

@@ -421,7 +421,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
               </div>
 
                 <div className="flex min-w-[180px] flex-col justify-center rounded-3xl bg-gray-900 px-5 py-4 text-right text-white sm:text-left">
-                  <p className="text-xs uppercase tracking-widest text-slate-300">Próxima reiteración</p>
+                  <p className="text-xs uppercase tracking-widest text-slate-300">🔥 Nuevo desafío en</p>
                   <p className="mt-2 text-4xl font-bold">{remainingText}</p>
                 </div>
             </div>

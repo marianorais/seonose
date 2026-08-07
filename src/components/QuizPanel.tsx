@@ -433,17 +433,19 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
 
                 return (
                   <div key={index} className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm font-semibold text-gray-600">Pregunta {index + 1}</p>
+                    <p className="text-md font-semibold text-gray-600">Pregunta {index + 1}</p>
                     <div className="mt-2 flex items-start gap-3">
                       {(() => {
                         const question = questions.find((item) => item.id === answerItem.questionId)
                         return renderCategoryBadge(question)
                       })()}
-                      <p className="text-base leading-7 text-gray-900">{answerItem.question}</p>
+                      <p className="text-base leading-7 text-gray-900" style={{ fontSize: '1.125rem' }}>
+                        {answerItem.question}
+                      </p>
                     </div>
 
                     <div className="mt-4 space-y-4">
-                      <div className="rounded-3xl bg-slate-50 p-4 text-sm">
+                      <div className="rounded-3xl bg-slate-50 p-4 text-lg">
                         <span className="font-semibold text-gray-700">Tu respuesta:</span>{' '}
                         <span className={answerItem.isCorrect ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
                           {answerItem.isCorrect ? '✓ ' : '✗ '}{answerItem.userAnswer || '(sin respuesta)'}
@@ -457,7 +459,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
                           const optionClasses = 'border-slate-200 bg-slate-50 text-slate-600'
 
                           return (
-                            <div key={option} className={`rounded-3xl border p-4 text-sm font-semibold ${optionClasses}`}>
+                            <div key={option} className={`rounded-3xl border p-4 text-lg font-semibold ${optionClasses}`}>
                               <div className="flex items-center justify-between gap-2">
                                 <span>{option}</span>
                                 {isCorrectOption && <span className="text-green-600 font-bold">✓</span>}

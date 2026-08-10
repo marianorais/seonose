@@ -1,68 +1,65 @@
-import { useEffect, useState } from 'react'
-import { PERIOD_DEFINITIONS, PERIOD_ORDER, obtenerRanking } from '../lib/rankingHelpers'
-import type { RankingEntry, RankingPeriod, RankingResult } from '../lib/rankingHelpers'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  DEFAULT_METRIC,
+  METRIC_DEFINITIONS,
+  METRIC_ORDER,
+  PERIOD_DEFINITIONS,
+  PERIOD_ORDER,
+  construirMensajeProgreso,
+  construirRanking,
+  obtenerRanking,
+} from '../lib/rankingHelpers'
+import type {
+  PeriodDefinition,
+  RankingData,
+  RankingEntry,
+  RankingMetric,
+  RankingPeriod,
+  RankingResult,
+} from '../lib/rankingHelpers'
+import { aliasRechazado, obtenerAliasDeIp, obtenerIpActual } from '../lib/aliasHelpers'
+import AliasPrompt from './AliasPrompt'
 
-/** Paleta de cada puesto del podio. */
+/** Paleta y medalla de cada puesto del podio. */
 const PODIUM_STYLES = {
   1: {
     name: 'Oro',
+    medal: '🥇',
     gradient: 'from-amber-200 via-amber-400 to-amber-600',
     panel: 'from-amber-50 to-white',
     border: 'border-amber-300',
     text: 'text-amber-700',
     glow: 'shadow-amber-200/60',
-    stops: ['#FEF3C7', '#F59E0B', '#B45309'],
   },
   2: {
     name: 'Plata',
+    medal: '🥈',
     gradient: 'from-slate-100 via-slate-300 to-slate-500',
     panel: 'from-slate-50 to-white',
     border: 'border-slate-300',
     text: 'text-slate-600',
     glow: 'shadow-slate-200/60',
-    stops: ['#F8FAFC', '#CBD5E1', '#64748B'],
   },
   3: {
     name: 'Bronce',
+    medal: '🥉',
     gradient: 'from-orange-200 via-orange-400 to-orange-700',
     panel: 'from-orange-50 to-white',
     border: 'border-orange-300',
     text: 'text-orange-700',
     glow: 'shadow-orange-200/60',
-    stops: ['#FDE4CF', '#EA9A5B', '#92400E'],
   },
 } as const
 
 type Podium = keyof typeof PODIUM_STYLES
 
-/** Corona del podio. El degradé lleva el puesto en el id para no colisionar. */
-const CrownIcon = ({ place, className = '' }: { place: Podium; className?: string }) => {
-  const [from, via, to] = PODIUM_STYLES[place].stops
-  const gradientId = `corona-${place}`
+const esPodio = (position: number): position is Podium => position >= 1 && position <= 3
 
-  return (
-    <svg viewBox="0 0 24 24" className={className} role="img" aria-label={`Medalla de ${PODIUM_STYLES[place].name}`}>
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={from} />
-          <stop offset="55%" stopColor={via} />
-          <stop offset="100%" stopColor={to} />
-        </linearGradient>
-      </defs>
-      <path d="M3.6 15.8 2.2 7.9a.9.9 0 0 1 1.4-.9l4 2.9 3.5-5.2a.9.9 0 0 1 1.5 0l3.5 5.2 4-2.9a.9.9 0 0 1 1.4.9l-1.4 7.9z" fill={`url(#${gradientId})`} />
-      <rect x="3.4" y="17.2" width="17.2" height="3.1" rx="1.1" fill={`url(#${gradientId})`} />
-      <circle cx="12" cy="12.4" r="1.15" fill="#fff" fillOpacity="0.75" />
-      <circle cx="6.4" cy="12.9" r="0.85" fill="#fff" fillOpacity="0.6" />
-      <circle cx="17.6" cy="12.9" r="0.85" fill="#fff" fillOpacity="0.6" />
-    </svg>
-  )
-}
-
-const ClockIcon = ({ className = '' }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-    <circle cx="12" cy="12" r="9" />
-    <path d="M12 7.5v5l3 1.8" strokeLinecap="round" />
-  </svg>
+/** Medalla del puesto. Es el único indicador de podio, en los tres lugares donde aparece. */
+const Medalla = ({ place, className = '' }: { place: Podium; className?: string }) => (
+  <span className={className} role="img" aria-label={`Medalla de ${PODIUM_STYLES[place].name}`}>
+    {PODIUM_STYLES[place].medal}
+  </span>
 )
 
 /** Avatar con emoji y color derivados del alias, para reconocerse de un vistazo. */
@@ -90,43 +87,39 @@ const YouChip = () => (
   </span>
 )
 
-const AccuracyBar = ({ accuracy, place }: { accuracy: number; place?: Podium }) => (
+/** Barra de progreso relativa al líder (o al 100% en modo porcentaje). */
+const MetricBar = ({ progress, place }: { progress: number; place?: Podium }) => (
   <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80" aria-hidden>
     <div
       className={`h-full rounded-full bg-gradient-to-r ${place ? PODIUM_STYLES[place].gradient : 'from-sky-400 to-sky-600'}`}
-      style={{ width: `${Math.max(4, Math.min(100, accuracy))}%` }}
+      style={{ width: `${Math.max(4, Math.min(100, progress))}%` }}
     />
   </div>
 )
 
-const formatearTiempo = (seconds: number | null) => (seconds === null ? '—' : `${seconds}s`)
-
-/** Exactitud, aciertos y tiempo. Se reusa en las dos disposiciones del podio. */
-const PodiumStats = ({
+/**
+ * Valor del jugador en la métrica activa. Es el único dato numérico que se
+ * muestra: ni tiempos, ni partidas, ni identificadores.
+ */
+const MetricValue = ({
   entry,
+  metric,
   isChampion,
   align,
 }: {
   entry: RankingEntry
+  metric: RankingMetric
   isChampion: boolean
   align: 'right' | 'center'
 }) => (
   <div className={align === 'right' ? 'text-right' : 'text-center'}>
-    <p className={`font-black tabular-nums leading-none text-slate-900 ${isChampion ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'}`}>
-      {entry.accuracy}%
-    </p>
-    <p className="mt-1 text-[0.7rem] text-slate-600 sm:text-xs">
-      {entry.correct}/{entry.total} aciertos
-    </p>
-    <div
-      className={`mt-0.5 flex items-center gap-1 text-[0.7rem] font-semibold text-slate-600 sm:text-xs ${
-        align === 'right' ? 'justify-end' : 'justify-center'
+    <p
+      className={`font-black tabular-nums leading-none text-slate-900 ${
+        isChampion ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'
       }`}
     >
-      <ClockIcon className="h-3.5 w-3.5" />
-      <span className="tabular-nums">{formatearTiempo(entry.avgResponseTime)}</span>
-      <span className="font-normal text-slate-500">prom.</span>
-    </div>
+      {METRIC_DEFINITIONS[metric].formatear(entry)}
+    </p>
   </div>
 )
 
@@ -135,9 +128,20 @@ const PodiumStats = ({
  * tres puestos entran sin scroll), y desde `sm` es una columna que forma el
  * podio 2-1-3 con el campeón elevado.
  */
-const PodiumCard = ({ entry, place }: { entry: RankingEntry; place: Podium }) => {
+const PodiumCard = ({
+  entry,
+  place,
+  metric,
+  leader,
+}: {
+  entry: RankingEntry
+  place: Podium
+  metric: RankingMetric
+  leader: RankingEntry
+}) => {
   const style = PODIUM_STYLES[place]
   const isChampion = place === 1
+  const progress = METRIC_DEFINITIONS[metric].progreso(entry, leader)
 
   return (
     <div
@@ -151,7 +155,7 @@ const PodiumCard = ({ entry, place }: { entry: RankingEntry; place: Podium }) =>
         {place}º {style.name}
       </span>
 
-      <CrownIcon place={place} className={`shrink-0 ${isChampion ? 'h-8 w-8 sm:h-11 sm:w-11' : 'h-7 w-7 sm:h-9 sm:w-9'}`} />
+      <Medalla place={place} className={`shrink-0 leading-none ${isChampion ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'}`} />
 
       <PlayerAvatar entry={entry} size={isChampion ? 'lg' : 'md'} />
 
@@ -162,26 +166,33 @@ const PodiumCard = ({ entry, place }: { entry: RankingEntry; place: Podium }) =>
           </p>
           {entry.isCurrentPlayer && <YouChip />}
         </div>
-        <p className="text-[0.7rem] text-slate-500">#{entry.code}</p>
 
-        {/* Desde sm las cifras van debajo del nombre, centradas en la columna. */}
+        {/* Desde sm la cifra va debajo del nombre, centrada en la columna. */}
         <div className="hidden sm:mt-1 sm:block">
-          <PodiumStats entry={entry} isChampion={isChampion} align="center" />
+          <MetricValue entry={entry} metric={metric} isChampion={isChampion} align="center" />
         </div>
 
-        <AccuracyBar accuracy={entry.accuracy} place={place} />
+        <MetricBar progress={progress} place={place} />
       </div>
 
-      {/* En celular las cifras van a la derecha para que la fila sea baja. */}
+      {/* En celular la cifra va a la derecha para que la fila sea baja. */}
       <div className="shrink-0 sm:hidden">
-        <PodiumStats entry={entry} isChampion={isChampion} align="right" />
+        <MetricValue entry={entry} metric={metric} isChampion={isChampion} align="right" />
       </div>
     </div>
   )
 }
 
 /** Fila del 4º en adelante. */
-const RankingRow = ({ entry }: { entry: RankingEntry }) => (
+const RankingRow = ({
+  entry,
+  metric,
+  leader,
+}: {
+  entry: RankingEntry
+  metric: RankingMetric
+  leader: RankingEntry
+}) => (
   <li
     className={`flex items-center gap-3 rounded-[1.25rem] border border-slate-200 bg-white px-3 py-2.5 ${
       entry.isCurrentPlayer ? 'ring-2 ring-sky-500' : ''
@@ -196,18 +207,113 @@ const RankingRow = ({ entry }: { entry: RankingEntry }) => (
         <p className="truncate text-sm font-semibold text-slate-900 sm:text-base">{entry.alias}</p>
         {entry.isCurrentPlayer && <YouChip />}
       </div>
-      <AccuracyBar accuracy={entry.accuracy} />
+      <MetricBar progress={METRIC_DEFINITIONS[metric].progreso(entry, leader)} />
     </div>
 
     <div className="shrink-0 text-right">
-      <p className="text-base font-bold tabular-nums text-slate-900 sm:text-lg">{entry.accuracy}%</p>
-      <p className="flex items-center justify-end gap-1 text-[0.7rem] text-slate-500">
-        <ClockIcon className="h-3 w-3" />
-        <span className="tabular-nums">{formatearTiempo(entry.avgResponseTime)}</span>
+      <p className="text-base font-bold tabular-nums text-slate-900 sm:text-lg">
+        {METRIC_DEFINITIONS[metric].formatear(entry)}
       </p>
     </div>
   </li>
 )
+
+/**
+ * `TuPosicionCard` - Bloque destacado con la posición del jugador que está
+ * mirando. Se muestra siempre, incluso si entró al podio: es el que sostiene la
+ * sensación de progreso, así que tiene que estar aunque las noticias sean
+ * buenas.
+ *
+ * Cubre los tres estados posibles: ya está en el ranking, jugó pero todavía no
+ * llega al mínimo de partidas, o no jugó en el período.
+ */
+const TuPosicionCard = ({
+  result,
+  definition,
+  metric,
+}: {
+  result: RankingResult
+  definition: PeriodDefinition
+  metric: RankingMetric
+}) => {
+  const { currentPlayer } = result
+
+  const contenido = () => {
+    if (currentPlayer) {
+      const place = esPodio(currentPlayer.position) ? currentPlayer.position : null
+
+      return (
+        <>
+          <div className="mt-3 flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-2xl bg-white/10">
+              {place ? (
+                <>
+                  <Medalla place={place} className="text-2xl leading-none" />
+                  <span className="mt-1 text-[0.6rem] font-bold uppercase tracking-wider text-white/80">
+                    {PODIUM_STYLES[place].name}
+                  </span>
+                </>
+              ) : (
+                <span className="text-2xl font-black tabular-nums text-white">#{currentPlayer.position}</span>
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="break-words text-lg font-bold text-white sm:text-xl">{currentPlayer.alias}</p>
+              <p className="mt-1 text-base font-semibold text-amber-200">
+                ⭐ {METRIC_DEFINITIONS[metric].formatear(currentPlayer)}
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-3 rounded-[1.25rem] bg-white/10 px-4 py-3 text-sm font-semibold text-amber-100">
+            {construirMensajeProgreso(currentPlayer, result.playerAbove, metric)}
+          </p>
+        </>
+      )
+    }
+
+    if (result.gamesToQualify !== null && result.gamesToQualify > 0) {
+      const faltantes = result.gamesToQualify
+
+      return (
+        <div className="mt-3">
+          <p className="text-lg font-bold text-white">
+            Jugaste {result.currentPlayerGames} {result.currentPlayerGames === 1 ? 'partida' : 'partidas'}
+          </p>
+          <p className="mt-2 rounded-[1.25rem] bg-white/10 px-4 py-3 text-sm font-semibold text-amber-100">
+            ⬆️ Te {faltantes === 1 ? 'falta' : 'faltan'} {faltantes} {faltantes === 1 ? 'partida' : 'partidas'} para
+            entrar al ranking de este período.
+          </p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="mt-3">
+        <p className="text-lg font-bold text-white">Todavía no estás en este ranking</p>
+        <p className="mt-2 rounded-[1.25rem] bg-white/10 px-4 py-3 text-sm font-semibold text-amber-100">
+          🎯 Jugá la partida de hoy
+          {definition.minGames > 1 ? ` y sumá ${definition.minGames} partidas en el período para entrar.` : ' y entrá al ranking.'}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-[1.5rem] border-2 border-sky-500 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 p-4 shadow-lg sm:p-5">
+      <div
+        className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-sky-400/20 blur-2xl"
+        aria-hidden
+      />
+
+      <div className="relative">
+        <p className="text-[0.65rem] font-bold uppercase tracking-[0.3em] text-sky-300">👤 Tu posición</p>
+        {contenido()}
+      </div>
+    </div>
+  )
+}
 
 const PeriodTabs = ({
   period,
@@ -238,6 +344,36 @@ const PeriodTabs = ({
   </div>
 )
 
+/** Filtro de métrica. Mismo lenguaje visual que `PeriodTabs`, un nivel más abajo. */
+const MetricTabs = ({
+  metric,
+  onChange,
+}: {
+  metric: RankingMetric
+  onChange: (next: RankingMetric) => void
+}) => (
+  <div role="tablist" aria-label="Criterio del ranking" className="flex gap-1 rounded-full border border-slate-200 bg-white p-1">
+    {METRIC_ORDER.map((option) => {
+      const isActive = option === metric
+
+      return (
+        <button
+          key={option}
+          type="button"
+          role="tab"
+          aria-selected={isActive}
+          onClick={() => onChange(option)}
+          className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+            isActive ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          }`}
+        >
+          {METRIC_DEFINITIONS[option].label}
+        </button>
+      )
+    })}
+  </div>
+)
+
 const SkeletonBoard = () => (
   <div className="animate-pulse space-y-3">
     <div className="grid gap-3 sm:grid-cols-3">
@@ -254,22 +390,25 @@ const SkeletonBoard = () => (
 type BoardState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; result: RankingResult }
+  | { status: 'ready'; data: RankingData }
 
 /**
  * Se monta con `key={period}`: al cambiar de período React lo reinicia y el
  * estado arranca en "loading" sin necesidad de un setState síncrono dentro del
  * efecto.
+ *
+ * La métrica NO forma parte de la key: los datos del período se traen una sola
+ * vez y alternar entre "Puntos" y "% de aciertos" sólo los reordena en memoria.
  */
-const PeriodBoard = ({ period }: { period: RankingPeriod }) => {
+const PeriodBoard = ({ period, metric }: { period: RankingPeriod; metric: RankingMetric }) => {
   const [state, setState] = useState<BoardState>({ status: 'loading' })
 
   useEffect(() => {
     let active = true
 
     obtenerRanking(period)
-      .then((result) => {
-        if (active) setState({ status: 'ready', result })
+      .then((data) => {
+        if (active) setState({ status: 'ready', data })
       })
       .catch((error: unknown) => {
         if (!active) return
@@ -285,6 +424,13 @@ const PeriodBoard = ({ period }: { period: RankingPeriod }) => {
     }
   }, [period])
 
+  const data = state.status === 'ready' ? state.data : null
+
+  const result = useMemo(
+    () => (data ? construirRanking(data, metric) : null),
+    [data, metric]
+  )
+
   if (state.status === 'loading') return <SkeletonBoard />
 
   if (state.status === 'error') {
@@ -296,31 +442,14 @@ const PeriodBoard = ({ period }: { period: RankingPeriod }) => {
     )
   }
 
-  const { result } = state
-  const definition = PERIOD_DEFINITIONS[period]
+  if (!result) return <SkeletonBoard />
 
-  if (result.entries.length === 0) {
-    return (
-      <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-        <p className="text-3xl" aria-hidden>
-          🏆
-        </p>
-        <p className="mt-2 text-sm font-semibold text-slate-800">Todavía no hay podio para este período</p>
-        <p className="mt-1 text-xs text-slate-600">
-          {definition.minGames > 1
-            ? `Se necesitan al menos ${definition.minGames} partidas en el período para entrar al ranking.`
-            : 'Jugá la partida de hoy y sé el primero en aparecer acá.'}
-        </p>
-      </div>
-    )
-  }
+  const definition = PERIOD_DEFINITIONS[period]
 
   const podium = result.entries.slice(0, 3)
   const rest = result.entries.slice(3)
-  const currentOutsideTop =
-    result.currentPlayer && !result.entries.some((entry) => entry.isCurrentPlayer)
-      ? result.currentPlayer
-      : null
+  const hayPodio = result.entries.length > 0
+  const leader = result.entries[0]
 
   // En celular se apila 1-2-3; desde `sm` se reordena a 2-1-3 como un podio real.
   const podiumOrder = ['sm:order-2', 'sm:order-1', 'sm:order-3']
@@ -334,33 +463,42 @@ const PeriodBoard = ({ period }: { period: RankingPeriod }) => {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3 sm:items-end sm:gap-3 sm:pt-4">
-        {podium.map((entry, index) => (
-          <div key={entry.playerKey} className={podiumOrder[index]}>
-            <PodiumCard entry={entry} place={(index + 1) as Podium} />
+      {hayPodio ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3 sm:items-end sm:gap-3 sm:pt-4">
+            {podium.map((entry, index) => (
+              <div key={entry.playerKey} className={podiumOrder[index]}>
+                <PodiumCard entry={entry} place={(index + 1) as Podium} metric={metric} leader={leader} />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {rest.length > 0 && (
-        <ul className="space-y-2">
-          {rest.map((entry) => (
-            <RankingRow key={entry.playerKey} entry={entry} />
-          ))}
-        </ul>
-      )}
-
-      {currentOutsideTop && (
-        <div className="space-y-2">
-          <p className="text-center text-xs font-semibold uppercase tracking-wider text-slate-400">Tu posición</p>
-          <ul>
-            <RankingRow entry={currentOutsideTop} />
-          </ul>
+          {rest.length > 0 && (
+            <ul className="space-y-2">
+              {rest.map((entry) => (
+                <RankingRow key={entry.playerKey} entry={entry} metric={metric} leader={leader} />
+              ))}
+            </ul>
+          )}
+        </>
+      ) : (
+        <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+          <p className="text-3xl" aria-hidden>
+            🏆
+          </p>
+          <p className="mt-2 text-sm font-semibold text-slate-800">Todavía no hay podio para este período</p>
+          <p className="mt-1 text-xs text-slate-600">
+            {definition.minGames > 1
+              ? `Se necesitan al menos ${definition.minGames} partidas en el período para entrar al ranking.`
+              : 'Jugá la partida de hoy y sé el primero en aparecer acá.'}
+          </p>
         </div>
       )}
 
+      <TuPosicionCard result={result} definition={definition} metric={metric} />
+
       <p className="text-center text-[0.7rem] text-slate-500 sm:text-xs">
-        Se ordena por exactitud; a igual exactitud, gana quien respondió más rápido.
+        {METRIC_DEFINITIONS[metric].criterio}
         {definition.minGames > 1 && ` Mínimo ${definition.minGames} partidas en el período.`}
       </p>
     </div>
@@ -373,11 +511,56 @@ const PeriodBoard = ({ period }: { period: RankingPeriod }) => {
  */
 const RankingBoard = () => {
   const [period, setPeriod] = useState<RankingPeriod>('diario')
+  const [metric, setMetric] = useState<RankingMetric>(DEFAULT_METRIC)
+  // Cambia al guardar el alias para que el podio se recargue y lo muestre.
+  const [recarga, setRecarga] = useState(0)
+  // IP a la que pedirle alias. `null` mientras se averigua o si no corresponde.
+  const [ipSinAlias, setIpSinAlias] = useState<string | null>(null)
+
+  /**
+   * Al entrar al ranking se consulta si esta IP ya tiene alias. Sólo se
+   * pregunta si no lo tiene y si antes no dijo "ahora no": así el pedido
+   * aparece una vez y no vuelve.
+   */
+  useEffect(() => {
+    let activo = true
+
+    const revisarAlias = async () => {
+      if (aliasRechazado()) return
+
+      const ip = await obtenerIpActual()
+
+      if (!ip || !activo) return
+
+      const consulta = await obtenerAliasDeIp(ip)
+
+      // Si ya tiene alias, o si no se pudo consultar, no se pregunta nada.
+      if (!activo || !consulta.ok || consulta.alias) return
+
+      setIpSinAlias(ip)
+    }
+
+    revisarAlias()
+
+    return () => {
+      activo = false
+    }
+  }, [])
 
   return (
     <div className="space-y-4 sm:space-y-5">
       <PeriodTabs period={period} onChange={setPeriod} />
-      <PeriodBoard key={period} period={period} />
+      <MetricTabs metric={metric} onChange={setMetric} />
+      <PeriodBoard key={`${period}-${recarga}`} period={period} metric={metric} />
+
+      {ipSinAlias && (
+        <AliasPrompt
+          isOpen
+          ip={ipSinAlias}
+          onClose={() => setIpSinAlias(null)}
+          onSaved={() => setRecarga((valor) => valor + 1)}
+        />
+      )}
     </div>
   )
 }

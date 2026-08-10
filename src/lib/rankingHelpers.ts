@@ -5,23 +5,22 @@
  * pinta lo que recibe y todo lo que se puede razonar sin un navegador —rangos
  * de fechas, alias de jugador, criterio de orden— vive acá y es testeable.
  *
- * Cómo se identifica a un jugador: la base no guarda ningún nombre, sólo
- * `userip` + `useragent`. Se deriva un alias estable de esos dos datos, así el
- * ranking funciona con las partidas ya existentes y sin exponer la IP (nunca
- * sale del cliente hacia la vista).
+ * Cómo se identifica a un jugador: por su IP, que es lo que las partidas ya
+ * guardan en `game_sessions.userip`. El alias sale de `player_aliases` cuando
+ * esa IP eligió uno; si no, se deriva uno estable del hash de la IP. La IP
+ * nunca sale del cliente hacia la vista: sólo viaja el alias.
  */
 
 import { supabase } from './supabase'
 import { getClientInfo } from './userSession'
+import { obtenerAliasPorIp } from './aliasHelpers'
 
 export type RankingPeriod = 'diario' | 'mensual' | 'anual'
 
 export interface RankingEntry {
-  /** Clave interna del jugador (hash), nunca la IP. */
+  /** Clave interna del jugador (hash de la IP), nunca la IP en claro. */
   playerKey: string
   alias: string
-  /** Sufijo corto para distinguir alias repetidos. */
-  code: string
   emoji: string
   /** Tono HSL derivado del hash, para el avatar. */
   hue: number
@@ -29,6 +28,8 @@ export interface RankingEntry {
   games: number
   correct: number
   total: number
+  /** Puntos: 1 por respuesta correcta, 0 por incorrecta. */
+  points: number
   /** Exactitud 0-100 con un decimal. */
   accuracy: number
   /** Promedio de segundos por respuesta. `null` si no hay respuestas cargadas. */
@@ -36,10 +37,34 @@ export interface RankingEntry {
   isCurrentPlayer: boolean
 }
 
+/**
+ * Datos del período sin ordenar. Se separan del `RankingResult` porque no
+ * dependen de la métrica elegida: así cambiar entre "Puntos" y "% de aciertos"
+ * reordena lo que ya está en memoria en lugar de volver a pegarle a Supabase.
+ */
+export interface RankingData {
+  /** Jugadores que califican, sin posición asignada todavía. */
+  players: RankingEntry[]
+  currentPlayerGames: number
+  gamesToQualify: number | null
+  rangeLabel: string
+  minGames: number
+  excludedByMinGames: number
+}
+
 export interface RankingResult {
   entries: RankingEntry[]
   /** El jugador actual, incluso si quedó fuera del top mostrado. */
   currentPlayer: RankingEntry | null
+  /** Rival inmediatamente por encima del jugador actual. `null` si va 1º. */
+  playerAbove: RankingEntry | null
+  /**
+   * Partidas que le faltan al jugador actual para entrar al ranking.
+   * `null` si ya califica o si todavía no jugó en el período.
+   */
+  gamesToQualify: number | null
+  /** Partidas jugadas en el período por el jugador actual, califique o no. */
+  currentPlayerGames: number
   totalPlayers: number
   rangeLabel: string
   minGames: number
@@ -53,6 +78,7 @@ const AR_TIME_ZONE = 'America/Argentina/Buenos_Aires'
 const AR_UTC_OFFSET = '-03:00'
 
 const MAX_SESSIONS = 5000
+const MAX_ALIASES = 5000
 const ANSWERS_CHUNK_SIZE = 300
 export const RANKING_TOP_SIZE = 10
 
@@ -109,7 +135,7 @@ const formatearMes = (parts: DateParts) => {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-interface PeriodDefinition {
+export interface PeriodDefinition {
   id: RankingPeriod
   label: string
   /** Partidas mínimas para entrar al ranking del período. */
@@ -203,21 +229,6 @@ const hashFnv1a = (value: string) => {
   return hash >>> 0
 }
 
-/**
- * Familia de dispositivo en lugar del user agent completo: así el alias no
- * cambia cuando el navegador se actualiza de versión.
- */
-export const obtenerFamiliaDispositivo = (userAgent: string) => {
-  if (/iPhone|iPad|iPod/i.test(userAgent)) return 'ios'
-  if (/Android/i.test(userAgent)) return 'android'
-  if (/Mobile/i.test(userAgent)) return 'mobile'
-
-  return 'desktop'
-}
-
-export const construirClaveJugador = (ip: string, userAgent: string) =>
-  `${ip}|${obtenerFamiliaDispositivo(userAgent)}`
-
 /** Alias, emoji y color estables derivados de la clave del jugador. */
 export const construirIdentidad = (playerKey: string) => {
   const hash = hashFnv1a(playerKey)
@@ -227,27 +238,129 @@ export const construirIdentidad = (playerKey: string) => {
   return {
     alias: `${animal.name} ${adjetivo}`,
     emoji: animal.emoji,
-    code: hash.toString(16).toUpperCase().padStart(8, '0').slice(-4),
     hue: hash % 360,
   }
 }
 
-/**
- * Orden del ranking: primero exactitud, después volumen de aciertos y por
- * último rapidez. Se ordena por exactitud y no por aciertos crudos porque la
- * cantidad de preguntas por día cambió con el tiempo (hay partidas de 5, 6 y 8)
- * y comparar aciertos sueltos sería injusto.
- */
-export const compararEntradas = (a: RankingEntry, b: RankingEntry) => {
-  if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy
-  if (b.correct !== a.correct) return b.correct - a.correct
+const formatearNumero = (value: number) =>
+  value.toLocaleString('es-AR', { maximumFractionDigits: 1 })
 
+const pluralizar = (cantidad: number, singular: string, plural: string) =>
+  cantidad === 1 ? singular : plural
+
+/** Desempate final compartido: primero el más rápido, después alfabético. */
+const desempatarPorRapidez = (a: RankingEntry, b: RankingEntry) => {
   const tiempoA = a.avgResponseTime ?? Number.POSITIVE_INFINITY
   const tiempoB = b.avgResponseTime ?? Number.POSITIVE_INFINITY
 
   if (tiempoA !== tiempoB) return tiempoA - tiempoB
 
   return a.alias.localeCompare(b.alias, 'es')
+}
+
+/**
+ * Orden por exactitud: primero el porcentaje, después el volumen de puntos y
+ * por último la rapidez. Se mantiene tal cual estaba para que el modo
+ * "% de aciertos" siga ordenando como antes.
+ */
+export const compararEntradas = (a: RankingEntry, b: RankingEntry) => {
+  if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy
+  if (b.points !== a.points) return b.points - a.points
+
+  return desempatarPorRapidez(a, b)
+}
+
+/** Orden por puntos; a igual puntaje decide la exactitud y después la rapidez. */
+export const compararPorPuntos = (a: RankingEntry, b: RankingEntry) => {
+  if (b.points !== a.points) return b.points - a.points
+  if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy
+
+  return desempatarPorRapidez(a, b)
+}
+
+export type RankingMetric = 'puntos' | 'porcentaje'
+
+export interface MetricDefinition {
+  id: RankingMetric
+  label: string
+  /** Valor visible del jugador, ya formateado. Es lo único que se muestra. */
+  formatear: (entry: RankingEntry) => string
+  compare: (a: RankingEntry, b: RankingEntry) => number
+  /** Ancho 0-100 de la barra, relativo al líder. */
+  progreso: (entry: RankingEntry, leader: RankingEntry) => number
+  /** Qué le falta al jugador para alcanzar al de arriba. */
+  mensajeProgreso: (current: RankingEntry, above: RankingEntry) => string
+  /** Explicación del criterio, para el pie de la tabla. */
+  criterio: string
+}
+
+/**
+ * Una definición por métrica (Strategy), igual que `PERIOD_DEFINITIONS`: cada
+ * una sabe cómo ordenar, cómo mostrarse y cómo redactar el mensaje de progreso.
+ * Agregar una métrica nueva es sumar una entrada acá.
+ */
+export const METRIC_DEFINITIONS: Record<RankingMetric, MetricDefinition> = {
+  puntos: {
+    id: 'puntos',
+    label: 'Puntos',
+    formatear: (entry) => `${entry.points} ${pluralizar(entry.points, 'pt', 'pts')}`,
+    compare: compararPorPuntos,
+    progreso: (entry, leader) => (leader.points > 0 ? (entry.points / leader.points) * 100 : 0),
+    mensajeProgreso: (current, above) => {
+      const faltantes = above.points - current.points
+
+      if (faltantes > 0) {
+        return `⬆️ Te ${pluralizar(faltantes, 'falta', 'faltan')} ${faltantes} ${pluralizar(faltantes, 'punto', 'puntos')} para alcanzar a ${above.alias} en el puesto #${above.position}.`
+      }
+
+      // Mismo puntaje: lo que decide es la exactitud y, si también empata, el tiempo.
+      if (above.accuracy > current.accuracy) {
+        return `⬆️ Empatás en puntos con ${above.alias}: mejorá tu porcentaje de aciertos para subir al puesto #${above.position}.`
+      }
+
+      return `⬆️ Estás a un suspiro de ${above.alias}: superalo respondiendo más rápido para subir al puesto #${above.position}.`
+    },
+    criterio: 'Se ordena por puntos: 1 por cada respuesta correcta. A igual puntaje, gana quien tiene mejor porcentaje de aciertos.',
+  },
+  porcentaje: {
+    id: 'porcentaje',
+    label: '% de aciertos',
+    formatear: (entry) => `${formatearNumero(entry.accuracy)}%`,
+    compare: compararEntradas,
+    progreso: (entry) => entry.accuracy,
+    mensajeProgreso: (current, above) => {
+      const diferencia = Math.round((above.accuracy - current.accuracy) * 10) / 10
+
+      if (diferencia > 0) {
+        return `⬆️ Te falta ${formatearNumero(diferencia)}% para alcanzar a ${above.alias} en el puesto #${above.position}.`
+      }
+
+      if (above.points > current.points) {
+        const faltantes = above.points - current.points
+
+        return `⬆️ Empatás en porcentaje con ${above.alias}: te ${pluralizar(faltantes, 'falta', 'faltan')} ${faltantes} ${pluralizar(faltantes, 'punto', 'puntos')} para subir al puesto #${above.position}.`
+      }
+
+      return `⬆️ Estás a un suspiro de ${above.alias}: superalo respondiendo más rápido para subir al puesto #${above.position}.`
+    },
+    criterio: 'Se ordena por porcentaje de aciertos sobre las preguntas respondidas. A igual porcentaje, gana quien sumó más puntos.',
+  },
+}
+
+export const METRIC_ORDER: RankingMetric[] = ['puntos', 'porcentaje']
+
+/** Métrica por defecto del ranking. */
+export const DEFAULT_METRIC: RankingMetric = 'puntos'
+
+/** Mensaje del bloque "Tu posición", según la métrica activa. */
+export const construirMensajeProgreso = (
+  current: RankingEntry,
+  above: RankingEntry | null,
+  metric: RankingMetric
+) => {
+  if (!above) return '🏆 Nadie te supera. Volvé mañana para defender el primer puesto.'
+
+  return METRIC_DEFINITIONS[metric].mensajeProgreso(current, above)
 }
 
 const dividirEnLotes = <T,>(items: T[], size: number) => {
@@ -265,7 +378,6 @@ interface SessionRow {
   correctanswers: number | null
   totalquestions: number | null
   userip: string | null
-  useragent: string | null
 }
 
 interface PlayerAccumulator {
@@ -278,19 +390,19 @@ interface PlayerAccumulator {
 }
 
 /** Cachea la IP propia: `getClientInfo` pega a un servicio externo. */
-let cachedClientKey: string | null | undefined
+let cachedClientIp: string | null | undefined
 
-const obtenerClaveJugadorActual = async () => {
-  if (cachedClientKey !== undefined) return cachedClientKey
+const obtenerIpJugadorActual = async () => {
+  if (cachedClientIp !== undefined) return cachedClientIp
 
   try {
     const info = await getClientInfo()
-    cachedClientKey = info.ip ? construirClaveJugador(info.ip, info.userAgent) : null
+    cachedClientIp = info.ip
   } catch {
-    cachedClientKey = null
+    cachedClientIp = null
   }
 
-  return cachedClientKey
+  return cachedClientIp
 }
 
 /** Suma el tiempo de respuesta por sesión, en lotes para no armar URLs enormes. */
@@ -326,25 +438,26 @@ const obtenerTiemposPorSesion = async (sessionIds: number[]) => {
 }
 
 /**
- * Arma el ranking del período. Agrega por jugador (no por partida), así quien
- * juega varias veces en el día aparece una sola vez.
+ * Trae y agrega las partidas del período. Agrega por jugador (no por partida),
+ * así quien juega varias veces en el día aparece una sola vez.
+ *
+ * No ordena ni asigna posiciones: de eso se encarga `construirRanking`, que es
+ * puro y depende de la métrica elegida.
  */
-export const obtenerRanking = async (
-  period: RankingPeriod,
-  topSize: number = RANKING_TOP_SIZE
-): Promise<RankingResult> => {
+export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData> => {
   const definition = PERIOD_DEFINITIONS[period]
   const { fromIso, toIso, rangeLabel } = definition.buildRange(obtenerFechaEnArgentina(new Date()))
 
-  const [{ data: sessions, error }, currentKey] = await Promise.all([
+  const [{ data: sessions, error }, ipActual, aliasPorIp] = await Promise.all([
     supabase
       .from('game_sessions')
-      .select('id,correctanswers,totalquestions,userip,useragent')
+      .select('id,correctanswers,totalquestions,userip')
       .gte('completedat', fromIso)
       .lt('completedat', toIso)
       .not('userip', 'is', null)
       .limit(MAX_SESSIONS),
-    obtenerClaveJugadorActual(),
+    obtenerIpJugadorActual(),
+    obtenerAliasPorIp(MAX_ALIASES),
   ])
 
   if (error) throw new Error(error.message)
@@ -352,23 +465,27 @@ export const obtenerRanking = async (
   const rows = (sessions ?? []) as SessionRow[]
   const playableRows = rows.filter((row) => row.userip && (row.totalquestions ?? 0) > 0)
 
-  const emptyResult: RankingResult = {
-    entries: [],
-    currentPlayer: null,
-    totalPlayers: 0,
+  const emptyData: RankingData = {
+    players: [],
+    currentPlayerGames: 0,
+    gamesToQualify: null,
     rangeLabel,
     minGames: definition.minGames,
     excludedByMinGames: 0,
   }
 
-  if (playableRows.length === 0) return emptyResult
+  if (playableRows.length === 0) return emptyData
 
   const times = await obtenerTiemposPorSesion(playableRows.map((row) => row.id))
+
+  // La IP es la clave del jugador: todas sus partidas del período caen en la
+  // misma fila del ranking, tenga alias elegido o no.
+  const esJugadorActual = (playerKey: string) => ipActual !== null && playerKey === ipActual
 
   const accumulators = new Map<string, PlayerAccumulator>()
 
   for (const row of playableRows) {
-    const playerKey = construirClaveJugador(row.userip as string, row.useragent ?? '')
+    const playerKey = row.userip as string
 
     const accumulator =
       accumulators.get(playerKey) ??
@@ -392,34 +509,71 @@ export const obtenerRanking = async (
     (accumulator) => accumulator.games >= definition.minGames
   )
 
-  const ranked = qualified
-    .map((accumulator) => {
-      const identity = construirIdentidad(accumulator.playerKey)
+  const players = qualified.map((accumulator) => {
+    const identity = construirIdentidad(accumulator.playerKey)
+    const aliasElegido = aliasPorIp.get(accumulator.playerKey)
 
-      return {
-        playerKey: accumulator.playerKey,
-        ...identity,
-        position: 0,
-        games: accumulator.games,
-        correct: accumulator.correct,
-        total: accumulator.total,
-        accuracy: Math.round((accumulator.correct / accumulator.total) * 1000) / 10,
-        avgResponseTime:
-          accumulator.timeCount > 0
-            ? Math.round((accumulator.timeSum / accumulator.timeCount) * 10) / 10
-            : null,
-        isCurrentPlayer: Boolean(currentKey) && accumulator.playerKey === currentKey,
-      } satisfies RankingEntry
-    })
-    .sort(compararEntradas)
-    .map((entry, index) => ({ ...entry, position: index + 1 }))
+    return {
+      // Hash, nunca la IP: `playerKey` termina como `key` en el DOM.
+      playerKey: `p${hashFnv1a(accumulator.playerKey).toString(36)}`,
+      ...identity,
+      alias: aliasElegido ?? identity.alias,
+      position: 0,
+      games: accumulator.games,
+      correct: accumulator.correct,
+      total: accumulator.total,
+      // 1 punto por respuesta correcta, 0 por incorrecta.
+      points: accumulator.correct,
+      accuracy: Math.round((accumulator.correct / accumulator.total) * 1000) / 10,
+      avgResponseTime:
+        accumulator.timeCount > 0
+          ? Math.round((accumulator.timeSum / accumulator.timeCount) * 10) / 10
+          : null,
+      isCurrentPlayer: esJugadorActual(accumulator.playerKey),
+    } satisfies RankingEntry
+  })
+
+  // Se busca sobre todos los acumuladores, no sólo los que calificaron, para
+  // poder decirle al jugador cuántas partidas le faltan para entrar.
+  const acumuladorActual =
+    [...accumulators.values()].find((accumulator) => esJugadorActual(accumulator.playerKey)) ?? null
+
+  const califica = players.some((player) => player.isCurrentPlayer)
 
   return {
-    entries: ranked.slice(0, topSize),
-    currentPlayer: ranked.find((entry) => entry.isCurrentPlayer) ?? null,
-    totalPlayers: ranked.length,
+    players,
+    currentPlayerGames: acumuladorActual?.games ?? 0,
+    gamesToQualify: !califica && acumuladorActual ? definition.minGames - acumuladorActual.games : null,
     rangeLabel,
     minGames: definition.minGames,
     excludedByMinGames: accumulators.size - qualified.length,
+  }
+}
+
+/**
+ * Ordena por la métrica elegida y asigna posiciones. Es puro: alternar entre
+ * "Puntos" y "% de aciertos" sólo reordena lo que ya está en memoria.
+ */
+export const construirRanking = (
+  data: RankingData,
+  metric: RankingMetric,
+  topSize: number = RANKING_TOP_SIZE
+): RankingResult => {
+  const ranked = [...data.players]
+    .sort(METRIC_DEFINITIONS[metric].compare)
+    .map((entry, index) => ({ ...entry, position: index + 1 }))
+
+  const currentPlayer = ranked.find((entry) => entry.isCurrentPlayer) ?? null
+
+  return {
+    entries: ranked.slice(0, topSize),
+    currentPlayer,
+    playerAbove: currentPlayer && currentPlayer.position > 1 ? ranked[currentPlayer.position - 2] : null,
+    gamesToQualify: data.gamesToQualify,
+    currentPlayerGames: data.currentPlayerGames,
+    totalPlayers: ranked.length,
+    rangeLabel: data.rangeLabel,
+    minGames: data.minGames,
+    excludedByMinGames: data.excludedByMinGames,
   }
 }

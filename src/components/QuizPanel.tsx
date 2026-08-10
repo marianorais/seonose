@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { QuestionItem, QuestionSettings } from '../types'
 import ShareModal from './ShareModal'
 import { supabase } from '../lib/supabase'
 
 import { getClientInfo } from '../lib/userSession'
+import { MOSTRAR_ACCESO_RANKING } from '../lib/featureFlags'
 import {
   normalizar,
   obtenerNumeroPartida,
@@ -425,6 +427,42 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
                   <p className="mt-2 text-4xl font-bold">{remainingText}</p>
                 </div>
             </div>
+
+            {/*
+              Acceso al ranking, justo después del puntaje: es el momento en el
+              que el jugador quiere saber cómo le fue contra los demás.
+              Oculto hasta que el ranking esté productivo (ver `featureFlags`).
+            */}
+            {MOSTRAR_ACCESO_RANKING && (
+              <Link
+                to="/ranking"
+                className="group relative flex items-center justify-between gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 px-5 py-4 shadow-lg transition hover:shadow-xl sm:px-6"
+              >
+                <span
+                  className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full bg-amber-400/20 blur-2xl"
+                  aria-hidden
+                />
+
+                <span className="relative flex items-center gap-3">
+                  <span className="text-3xl" aria-hidden>
+                    🏆
+                  </span>
+                  <span>
+                    <span className="block text-[0.65rem] uppercase tracking-[0.3em] text-amber-300">Ranking</span>
+                    <span className="block text-base font-bold text-white sm:text-lg">
+                      Mirá en qué puesto quedaste
+                    </span>
+                  </span>
+                </span>
+
+                <span
+                  className="relative inline-block shrink-0 text-xl text-amber-300 transition group-hover:translate-x-1"
+                  aria-hidden
+                >
+                  →
+                </span>
+              </Link>
+            )}
 
               {/* Prominent share actions: WhatsApp, copy, native share */}
               <div className="space-y-4">

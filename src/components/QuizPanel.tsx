@@ -5,6 +5,7 @@ import ShareModal from './ShareModal'
 import { supabase } from '../lib/supabase'
 
 import { getClientInfo } from '../lib/userSession'
+import { cerrarAdopcion, obtenerPlayerId } from '../lib/playerIdentity'
 import { MOSTRAR_ACCESO_RANKING } from '../lib/featureFlags'
 import {
   normalizar,
@@ -87,21 +88,39 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
       try {
         const clientInfo = await getClientInfo()
 
-        if (!clientInfo.ip) {
-          console.warn('No se pudo obtener IP')
-          return
-        }
+        // La identidad del jugador ya no depende de la IP, así que una partida se
+        // guarda aunque el servicio de IP falle o esté bloqueado (habitual en
+        // móvil con bloqueadores). Antes, en ese caso, la partida se perdía.
+        const playerId = obtenerPlayerId()
+
+        // Hay partida guardada con este id: cambiarlo la dejaría huérfana.
+        cerrarAdopcion()
 
         const correctCount = finalAnswers.filter((a) => a.isCorrect).length
 
-        const { data: gameSession, error: sessionError } = await supabase.from('game_sessions').insert({
+        const datosSesion = {
           startedat: new Date().toISOString(),
           completedat: new Date().toISOString(),
           totalquestions: finalAnswers.length,
           correctanswers: correctCount,
           userip: clientInfo.ip,
           useragent: clientInfo.userAgent,
-        }).select().single()
+        }
+
+        const insertarSesion = (payload: Record<string, unknown>) =>
+          supabase.from('game_sessions').insert(payload).select().single()
+
+        let { data: gameSession, error: sessionError } = await insertarSesion({
+          ...datosSesion,
+          playerid: playerId,
+        })
+
+        if (sessionError) {
+          // Si la columna `playerid` todavía no existe (migración sin correr), la
+          // partida se guarda igual con el formato anterior.
+          console.warn('Reintentando guardar la partida sin playerid:', sessionError.message)
+          ;({ data: gameSession, error: sessionError } = await insertarSesion(datosSesion))
+        }
 
         if (sessionError || !gameSession) {
           console.error('Error creando sesión', sessionError)

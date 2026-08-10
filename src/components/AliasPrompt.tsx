@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { guardarAlias, marcarAliasRechazado } from '../lib/aliasHelpers'
+import { guardarAlias } from '../lib/aliasHelpers'
 
 interface AliasPromptProps {
   isOpen: boolean
-  /** IP del jugador: es la clave con la que se guarda el alias. */
-  ip: string
-  /** Se llama tanto si eligió alias como si lo rechazó: en ambos casos no se vuelve a preguntar. */
+  /** Identidad del jugador: es la clave con la que se guarda el alias. */
+  playerId: string
   onClose: () => void
   /** Sólo cuando el alias quedó guardado, para refrescar el ranking. */
   onSaved: () => void
@@ -13,7 +12,7 @@ interface AliasPromptProps {
 
 const MENSAJES_ERROR: Record<string, string> = {
   duplicado: 'Ese alias ya lo está usando otro jugador. Probá con otro.',
-  'ip-ocupada': 'Ya se había elegido un alias desde esta conexión.',
+  'ya-tiene': 'Ya tenías un alias elegido.',
   vacio: 'Escribí un alias para continuar.',
   error: 'No pudimos guardar el alias. Intentá de nuevo en un momento.',
 }
@@ -21,37 +20,39 @@ const MENSAJES_ERROR: Record<string, string> = {
 /**
  * `AliasPrompt` - Pide el nombre con el que el jugador aparece en el ranking.
  *
- * Se muestra sólo si la IP todavía no tiene alias. Si lo rechaza tampoco se
- * vuelve a preguntar: sigue jugando con el alias generado automáticamente, que
- * es lo que el ranking usa por defecto.
+ * Se muestra mientras el jugador no tenga alias, y vuelve a aparecer en cada
+ * visita hasta que ponga uno. No se acepta vacío ni sólo espacios. Una vez
+ * guardado no se pide más.
  */
-const AliasPrompt = ({ isOpen, ip, onClose, onSaved }: AliasPromptProps) => {
+const AliasPrompt = ({ isOpen, playerId, onClose, onSaved }: AliasPromptProps) => {
   const [alias, setAlias] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
   if (!isOpen) return null
 
-  const cerrarSinAlias = () => {
-    marcarAliasRechazado()
-    onClose()
-  }
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
 
     if (guardando) return
 
+    // Segunda barrera contra el vacío, además del botón deshabilitado: cubre el
+    // submit por Enter y el alias hecho sólo de espacios.
+    if (alias.trim() === '') {
+      setError(MENSAJES_ERROR.vacio)
+      return
+    }
+
     setGuardando(true)
     setError(null)
 
-    const resultado = await guardarAlias(ip, alias)
+    const resultado = await guardarAlias(playerId, alias)
 
     setGuardando(false)
 
     if (!resultado.ok) {
-      // Si esa IP ya tenía alias no tiene sentido seguir insistiendo.
-      if (resultado.motivo === 'ip-ocupada') {
+      // Si ya tenía alias no tiene sentido seguir insistiendo.
+      if (resultado.motivo === 'ya-tiene') {
         onSaved()
         onClose()
         return
@@ -75,8 +76,8 @@ const AliasPrompt = ({ isOpen, ip, onClose, onSaved }: AliasPromptProps) => {
         </h2>
 
         <p className="mt-3 text-sm text-slate-600">
-          Elegí el nombre con el que vas a aparecer en el ranking. Se pide una sola vez y después no se
-          puede cambiar, así que elegilo con cariño.
+          Elegí el nombre con el que vas a aparecer en el ranking. Después no se puede cambiar, así que
+          elegilo con cariño.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
@@ -110,7 +111,7 @@ const AliasPrompt = ({ isOpen, ip, onClose, onSaved }: AliasPromptProps) => {
 
             <button
               type="button"
-              onClick={cerrarSinAlias}
+              onClick={onClose}
               disabled={guardando}
               className="rounded-[1.5rem] border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
             >
@@ -120,7 +121,8 @@ const AliasPrompt = ({ isOpen, ip, onClose, onSaved }: AliasPromptProps) => {
         </form>
 
         <p className="mt-4 text-xs text-slate-500">
-          Si preferís no elegir, vas a seguir apareciendo con el nombre que te asignamos automáticamente.
+          Si preferís no elegir ahora, vas a seguir apareciendo con el nombre que te asignamos
+          automáticamente y te lo vamos a volver a preguntar la próxima vez.
         </p>
       </div>
     </div>

@@ -5,15 +5,21 @@
  * pinta lo que recibe y todo lo que se puede razonar sin un navegador —rangos
  * de fechas, alias de jugador, criterio de orden— vive acá y es testeable.
  *
- * Cómo se identifica a un jugador: por su IP, que es lo que las partidas ya
- * guardan en `game_sessions.userip`. El alias sale de `player_aliases` cuando
- * esa IP eligió uno; si no, se deriva uno estable del hash de la IP. La IP
- * nunca sale del cliente hacia la vista: sólo viaja el alias.
+ * Cómo se identifica a un jugador: por `game_sessions.playerid`, la identidad
+ * estable que vive en el dispositivo (ver `playerIdentity`). Las partidas
+ * anteriores a ese esquema quedaron con `playerid = 'ip:<IP>'` mediante el
+ * backfill de la migración, así que hay una sola forma de agrupar. El alias sale
+ * de `player_aliases`; si no eligió ninguno, se deriva uno estable del hash. La
+ * IP nunca sale del cliente hacia la vista: sólo viaja el alias.
+ *
+ * Reconocer al jugador actual ya no depende de la red: el identificador se lee
+ * del dispositivo de forma sincrónica, así que el ranking lo destaca aunque el
+ * servicio de IP esté lento o bloqueado.
  */
 
 import { supabase } from './supabase'
-import { getClientInfo } from './userSession'
-import { obtenerAliasPorIp } from './aliasHelpers'
+import { obtenerAliasPorPlayer } from './aliasHelpers'
+import { ipDeIdLegado, idLegadoDeIp, obtenerPlayerId } from './playerIdentity'
 
 export type RankingPeriod = 'diario' | 'mensual' | 'anual'
 
@@ -378,6 +384,7 @@ interface SessionRow {
   correctanswers: number | null
   totalquestions: number | null
   userip: string | null
+  playerid: string | null
 }
 
 interface PlayerAccumulator {
@@ -389,20 +396,37 @@ interface PlayerAccumulator {
   timeCount: number
 }
 
-/** Cachea la IP propia: `getClientInfo` pega a un servicio externo. */
-let cachedClientIp: string | null | undefined
+const COLUMNAS_SESION = 'id,correctanswers,totalquestions,userip,playerid'
+const COLUMNAS_SESION_LEGADO = 'id,correctanswers,totalquestions,userip'
 
-const obtenerIpJugadorActual = async () => {
-  if (cachedClientIp !== undefined) return cachedClientIp
+/**
+ * Sesiones del rango. Si `playerid` todavía no existe en la base (migración sin
+ * correr), reintenta con las columnas de siempre y agrupa por IP como antes: el
+ * ranking sigue andando en lugar de romperse entero.
+ */
+const obtenerSesionesDelRango = async (fromIso: string, toIso: string): Promise<SessionRow[]> => {
+  const consultar = (columnas: string) =>
+    supabase
+      .from('game_sessions')
+      .select(columnas)
+      .gte('completedat', fromIso)
+      .lt('completedat', toIso)
+      .limit(MAX_SESSIONS)
 
-  try {
-    const info = await getClientInfo()
-    cachedClientIp = info.ip
-  } catch {
-    cachedClientIp = null
-  }
+  const { data, error } = await consultar(COLUMNAS_SESION)
 
-  return cachedClientIp
+  if (!error) return (data ?? []) as unknown as SessionRow[]
+
+  console.warn('Leyendo game_sessions sin playerid:', error.message)
+
+  const { data: legado, error: errorLegado } = await consultar(COLUMNAS_SESION_LEGADO)
+
+  if (errorLegado) throw new Error(errorLegado.message)
+
+  return ((legado ?? []) as unknown as Omit<SessionRow, 'playerid'>[]).map((row) => ({
+    ...row,
+    playerid: null,
+  }))
 }
 
 /** Suma el tiempo de respuesta por sesión, en lotes para no armar URLs enormes. */
@@ -448,22 +472,19 @@ export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData
   const definition = PERIOD_DEFINITIONS[period]
   const { fromIso, toIso, rangeLabel } = definition.buildRange(obtenerFechaEnArgentina(new Date()))
 
-  const [{ data: sessions, error }, ipActual, aliasPorIp] = await Promise.all([
-    supabase
-      .from('game_sessions')
-      .select('id,correctanswers,totalquestions,userip')
-      .gte('completedat', fromIso)
-      .lt('completedat', toIso)
-      .not('userip', 'is', null)
-      .limit(MAX_SESSIONS),
-    obtenerIpJugadorActual(),
-    obtenerAliasPorIp(MAX_ALIASES),
+  const [rows, aliasPorPlayer] = await Promise.all([
+    obtenerSesionesDelRango(fromIso, toIso),
+    obtenerAliasPorPlayer(MAX_ALIASES),
   ])
 
-  if (error) throw new Error(error.message)
+  // Identidad propia: se lee del dispositivo, sin red.
+  const playerIdActual = obtenerPlayerId()
 
-  const rows = (sessions ?? []) as SessionRow[]
-  const playableRows = rows.filter((row) => row.userip && (row.totalquestions ?? 0) > 0)
+  // Una partida cuenta si se la puede atribuir a alguien: por identidad o, en
+  // las que quedaron sin backfill, por IP.
+  const playableRows = rows.filter(
+    (row) => (row.playerid || row.userip) && (row.totalquestions ?? 0) > 0
+  )
 
   const emptyData: RankingData = {
     players: [],
@@ -478,14 +499,15 @@ export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData
 
   const times = await obtenerTiemposPorSesion(playableRows.map((row) => row.id))
 
-  // La IP es la clave del jugador: todas sus partidas del período caen en la
-  // misma fila del ranking, tenga alias elegido o no.
-  const esJugadorActual = (playerKey: string) => ipActual !== null && playerKey === ipActual
+  // La identidad es la clave del jugador: todas sus partidas del período caen en
+  // la misma fila del ranking, tenga alias elegido o no.
+  const esJugadorActual = (playerKey: string) => playerKey === playerIdActual
 
   const accumulators = new Map<string, PlayerAccumulator>()
 
   for (const row of playableRows) {
-    const playerKey = row.userip as string
+    // Si el backfill no corrió, se deriva la misma clave que habría dejado.
+    const playerKey = row.playerid ?? idLegadoDeIp(row.userip as string)
 
     const accumulator =
       accumulators.get(playerKey) ??
@@ -510,11 +532,13 @@ export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData
   )
 
   const players = qualified.map((accumulator) => {
-    const identity = construirIdentidad(accumulator.playerKey)
-    const aliasElegido = aliasPorIp.get(accumulator.playerKey)
+    // El alias generado se deriva de la IP en las identidades heredadas, para
+    // que los jugadores anónimos de antes conserven el nombre que ya tenían.
+    const identity = construirIdentidad(ipDeIdLegado(accumulator.playerKey))
+    const aliasElegido = aliasPorPlayer.get(accumulator.playerKey)
 
     return {
-      // Hash, nunca la IP: `playerKey` termina como `key` en el DOM.
+      // Hash: `playerKey` termina como `key` en el DOM y no debe filtrar la IP.
       playerKey: `p${hashFnv1a(accumulator.playerKey).toString(36)}`,
       ...identity,
       alias: aliasElegido ?? identity.alias,

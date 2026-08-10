@@ -17,7 +17,12 @@ import type {
   RankingPeriod,
   RankingResult,
 } from '../lib/rankingHelpers'
-import { aliasRechazado, obtenerAliasDeIp, obtenerIpActual } from '../lib/aliasHelpers'
+import {
+  intentarAdoptarIdentidad,
+  obtenerAliasDePlayer,
+  obtenerAliasLocal,
+} from '../lib/aliasHelpers'
+import { obtenerPlayerId } from '../lib/playerIdentity'
 import AliasPrompt from './AliasPrompt'
 
 /** Paleta y medalla de cada puesto del podio. */
@@ -514,30 +519,48 @@ const RankingBoard = () => {
   const [metric, setMetric] = useState<RankingMetric>(DEFAULT_METRIC)
   // Cambia al guardar el alias para que el podio se recargue y lo muestre.
   const [recarga, setRecarga] = useState(0)
-  // IP a la que pedirle alias. `null` mientras se averigua o si no corresponde.
-  const [ipSinAlias, setIpSinAlias] = useState<string | null>(null)
+  // Identidad a la que pedirle alias. `null` mientras se averigua o si ya tiene.
+  const [playerSinAlias, setPlayerSinAlias] = useState<string | null>(null)
 
   /**
-   * Al entrar al ranking se consulta si esta IP ya tiene alias. Sólo se
-   * pregunta si no lo tiene y si antes no dijo "ahora no": así el pedido
-   * aparece una vez y no vuelve.
+   * Al entrar al ranking se revisa si este jugador ya tiene alias. Si no lo
+   * tiene se le pide, y se le vuelve a pedir en cada visita hasta que ponga uno:
+   * no hay marca de "no volver a preguntar".
+   *
+   * Antes de preguntar se intenta heredar la identidad previa de esta conexión,
+   * para no pedirle alias de nuevo a quien ya lo había elegido con el esquema
+   * anterior (y para no perderle las partidas).
    */
   useEffect(() => {
     let activo = true
 
     const revisarAlias = async () => {
-      if (aliasRechazado()) return
+      // Si ya se sabe localmente que hay alias, no se molesta ni se consulta.
+      if (obtenerAliasLocal()) return
 
-      const ip = await obtenerIpActual()
+      const playerId = obtenerPlayerId()
 
-      if (!ip || !activo) return
+      const consulta = await obtenerAliasDePlayer(playerId)
 
-      const consulta = await obtenerAliasDeIp(ip)
+      if (!activo) return
 
-      // Si ya tiene alias, o si no se pudo consultar, no se pregunta nada.
-      if (!activo || !consulta.ok || consulta.alias) return
+      // Si no se pudo consultar, no se pregunta: no queremos ofrecer algo que
+      // después no se va a poder guardar.
+      if (!consulta.ok) return
 
-      setIpSinAlias(ip)
+      if (consulta.alias) return
+
+      const heredado = await intentarAdoptarIdentidad()
+
+      if (!activo) return
+
+      if (heredado) {
+        // Recuperó su alias y su historial: hay que repintar el podio.
+        setRecarga((valor) => valor + 1)
+        return
+      }
+
+      setPlayerSinAlias(obtenerPlayerId())
     }
 
     revisarAlias()
@@ -553,11 +576,11 @@ const RankingBoard = () => {
       <MetricTabs metric={metric} onChange={setMetric} />
       <PeriodBoard key={`${period}-${recarga}`} period={period} metric={metric} />
 
-      {ipSinAlias && (
+      {playerSinAlias && (
         <AliasPrompt
           isOpen
-          ip={ipSinAlias}
-          onClose={() => setIpSinAlias(null)}
+          playerId={playerSinAlias}
+          onClose={() => setPlayerSinAlias(null)}
           onSaved={() => setRecarga((valor) => valor + 1)}
         />
       )}

@@ -8,4 +8,4 @@
  * Acceso al ranking desde la pantalla de resultados.
  * Ponelo en `true` cuando el ranking esté productivo.
  */
-export const MOSTRAR_ACCESO_RANKING = false
+export const MOSTRAR_ACCESO_RANKING = true

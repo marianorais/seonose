@@ -1,23 +1,23 @@
 /**
- * Alias del jugador, asociado a su identidad estable (ver `playerIdentity`).
+ * Alias del jugador, con agrupamiento de dispositivos en una sola tabla.
  *
- * Antes la clave era la IP pública, y en móvil eso se rompía: la IP rota y el
- * jugador perdía su alias al refrescar. Ahora `player_aliases` se indexa por
- * `playerid`, que vive en el dispositivo y no cambia.
+ * `player_aliases` tiene una fila por identidad de dispositivo y una columna
+ * `grupo` que apunta a la identidad que representa a la persona. El alias de un
+ * grupo es el de la fila donde `playerid = grupo`; las secundarias tienen alias
+ * nulo. Así una misma persona con varios dispositivos es UN jugador del ranking,
+ * sin borrar alias ni reescribir partidas.
  *
- * La columna `ip` se conserva sólo para la adopción única: las partidas y los
- * alias anteriores a este esquema quedaron identificados como `'ip:<IP>'`, así
- * que un dispositivo que arranca por primera vez puede heredar esa identidad y
- * no perder su historial.
- *
- * El alias también se guarda localmente para que la app sepa sin consultar la
- * red si ya hay uno elegido: en móvil la consulta puede tardar o fallar, y no
- * queremos volver a pedir un alias que ya existe.
+ * Por qué no se identifica por IP: no identifica un dispositivo. Rota por CGNAT,
+ * IP dinámica y VPN, y sobre todo por iCloud Private Relay, cuyos nodos de
+ * salida están compartidos por miles de usuarios de Apple. La columna `ip` queda
+ * sólo como referencia de la conexión desde la que se registró una identidad, y
+ * se usa únicamente para el vínculo con el esquema viejo.
  */
 
 import { supabase } from './supabase'
 import { getClientInfo } from './userSession'
-import { adoptarPlayerId, adopcionPendiente, cerrarAdopcion, esIdLegado } from './playerIdentity'
+import { adopcionPendiente, cerrarAdopcion } from './playerIdentity'
+import { tieneHistorialLocal } from './quizHelpers'
 
 const CLAVE_ALIAS_LOCAL = 'seonose-player-alias'
 
@@ -55,96 +55,155 @@ const guardarAliasLocal = (alias: string) => {
   }
 }
 
+export interface MapaIdentidades {
+  /** `true` si se pudo leer la tabla. `false` deja al ranking con alias generados. */
+  ok: boolean
+  /** Identidad de dispositivo -> grupo (la persona). */
+  grupoPorIdentidad: Map<string, string>
+  /** Grupo -> alias elegido por esa persona. */
+  aliasPorGrupo: Map<string, string>
+}
+
+interface FilaAlias {
+  playerid: string | null
+  alias: string | null
+  grupo: string | null
+}
+
+const MAPA_VACIO: MapaIdentidades = {
+  ok: false,
+  grupoPorIdentidad: new Map(),
+  aliasPorGrupo: new Map(),
+}
+
 /**
- * Alias de una identidad. `ok: false` significa que no se pudo consultar (por
- * ejemplo si todavía no se corrió la migración): en ese caso no se le pregunta
- * nada al jugador, para no ofrecerle algo que después no se va a poder guardar.
+ * Se cachea por carga de página: el ranking y el chequeo de alias necesitan lo
+ * mismo, y la tabla es chica. Evita repetir la consulta (el egress sí se factura,
+ * a diferencia de la cantidad de tablas).
+ */
+let cacheMapa: Promise<MapaIdentidades> | null = null
+
+export const invalidarCacheIdentidades = () => {
+  cacheMapa = null
+}
+
+export const obtenerMapaIdentidades = (limite: number): Promise<MapaIdentidades> => {
+  if (cacheMapa) return cacheMapa
+
+  cacheMapa = (async () => {
+    const { data, error } = await supabase
+      .from('player_aliases')
+      .select('playerid,alias,grupo')
+      .limit(limite)
+
+    if (error) {
+      // Sin la columna `grupo` (migración sin correr) el ranking sigue andando
+      // con los alias generados automáticamente.
+      console.warn('No se pudieron leer las identidades:', error.message)
+      cacheMapa = null
+
+      return MAPA_VACIO
+    }
+
+    const grupoPorIdentidad = new Map<string, string>()
+    const aliasPorGrupo = new Map<string, string>()
+
+    for (const fila of (data ?? []) as FilaAlias[]) {
+      if (!fila.playerid) continue
+
+      // Sin `grupo`, cada identidad es su propia persona.
+      const grupo = fila.grupo ?? fila.playerid
+
+      grupoPorIdentidad.set(fila.playerid, grupo)
+
+      // El nombre del grupo es el de la fila principal (`playerid === grupo`).
+      if (fila.alias && fila.playerid === grupo) aliasPorGrupo.set(grupo, fila.alias)
+    }
+
+    return { ok: true, grupoPorIdentidad, aliasPorGrupo }
+  })()
+
+  return cacheMapa
+}
+
+/**
+ * Alias de una identidad, resolviendo su grupo. `ok: false` significa que no se
+ * pudo consultar: en ese caso no se le pregunta nada al jugador, para no
+ * ofrecerle algo que después no se va a poder guardar.
  */
 export const obtenerAliasDePlayer = async (
   playerId: string
 ): Promise<{ ok: boolean; alias: string | null }> => {
-  const { data, error } = await supabase
-    .from('player_aliases')
-    .select('alias')
-    .eq('playerid', playerId)
-    .maybeSingle()
+  const mapa = await obtenerMapaIdentidades(5000)
 
-  if (error) {
-    console.warn('No se pudo consultar el alias:', error.message)
-    return { ok: false, alias: null }
-  }
+  if (!mapa.ok) return { ok: false, alias: null }
 
-  const alias = (data?.alias as string | undefined) ?? null
+  const grupo = mapa.grupoPorIdentidad.get(playerId)
+  const alias = grupo ? mapa.aliasPorGrupo.get(grupo) ?? null : null
 
   if (alias) guardarAliasLocal(alias)
 
   return { ok: true, alias }
 }
 
-/** Todos los alias elegidos, indexados por identidad, para armar el ranking. */
-export const obtenerAliasPorPlayer = async (limite: number): Promise<Map<string, string>> => {
-  const aliasPorPlayer = new Map<string, string>()
-
-  const { data, error } = await supabase.from('player_aliases').select('playerid,alias').limit(limite)
-
-  if (error) {
-    // Sin la tabla el ranking sigue funcionando con los alias generados.
-    console.warn('No se pudieron leer los alias:', error.message)
-    return aliasPorPlayer
-  }
-
-  for (const row of (data ?? []) as { playerid: string | null; alias: string | null }[]) {
-    if (row.playerid && row.alias) aliasPorPlayer.set(row.playerid, row.alias)
-  }
-
-  return aliasPorPlayer
+interface RespuestaFuncion {
+  estado?: string
+  alias?: string
 }
 
 /**
- * Adopción única: si esta conexión ya había elegido un alias con el esquema
- * viejo (fila con `playerid` heredado `'ip:<IP>'`), el dispositivo toma esa
- * identidad en lugar de su UUID recién creado. Así conserva su alias y todas
- * las partidas que había jugado.
+ * Vínculo único con el esquema viejo: si esta conexión ya tenía un alias elegido
+ * cuando la identidad era la IP, el dispositivo se suma como identidad más de esa
+ * misma persona. Conserva su propio identificador —no lo reemplaza— así que no
+ * puede quedar ninguna partida huérfana.
  *
- * Corre como máximo una vez por dispositivo y sólo sobre filas heredadas, para
- * que no se convierta en una regla permanente de reclamo de IPs —que es
- * precisamente lo inseguro, porque en móvil una misma IP pasa por varias
- * personas.
- *
- * Devuelve el alias heredado si adoptó algo.
+ * Devuelve el alias si quedó vinculado.
  */
-export const intentarAdoptarIdentidad = async (): Promise<string | null> => {
+export const intentarVincularIdentidad = async (playerId: string): Promise<string | null> => {
   if (!adopcionPendiente()) return null
+
+  /*
+   * Requisito imprescindible: este dispositivo tiene que haber jugado antes.
+   *
+   * Sin esta prueba el vínculo por IP sería una vía de apropiación de cuentas:
+   * las IPs de salida se comparten —CGNAT de las operadoras y, sobre todo, los
+   * nodos de iCloud Private Relay, que sirven a miles de usuarios de Apple por
+   * la misma dirección—, así que un visitante que nunca jugó podría entrar por
+   * la misma IP que otro y quedarse con su alias y su historial.
+   *
+   * Un dispositivo que ya jugó tiene su historial local; uno recién llegado, no.
+   */
+  if (!tieneHistorialLocal()) {
+    cerrarAdopcion()
+    return null
+  }
 
   const ip = await obtenerIpActual()
 
   if (!ip) return null
 
-  const { data, error } = await supabase
-    .from('player_aliases')
-    .select('playerid,alias')
-    .eq('ip', ip)
-    .limit(5)
+  const { data, error } = await supabase.rpc('vincular_identidad_por_ip', {
+    p_playerid: playerId,
+    p_ip: ip,
+  })
 
   if (error) {
-    // Se reintenta en la próxima visita: no se cierra la ventana de adopción.
+    // Se reintenta en la próxima visita: no se cierra la ventana.
     console.warn('No se pudo revisar la identidad heredada:', error.message)
     return null
   }
 
-  const filas = (data ?? []) as { playerid: string | null; alias: string | null }[]
-  const heredada = filas.find((fila) => fila.playerid && esIdLegado(fila.playerid) && fila.alias)
+  const respuesta = (data ?? {}) as RespuestaFuncion
 
-  if (!heredada?.playerid || !heredada.alias) {
-    // No hay nada que heredar: se cierra para no consultar en cada visita.
-    cerrarAdopcion()
-    return null
-  }
+  // Se cierra en cualquier caso resuelto, para no consultar en cada visita.
+  cerrarAdopcion()
 
-  adoptarPlayerId(heredada.playerid)
-  guardarAliasLocal(heredada.alias)
+  if (respuesta.estado !== 'ok' || !respuesta.alias) return null
 
-  return heredada.alias
+  guardarAliasLocal(respuesta.alias)
+  invalidarCacheIdentidades()
+
+  return respuesta.alias
 }
 
 export type ResultadoAlias =
@@ -152,11 +211,9 @@ export type ResultadoAlias =
   | { ok: false; motivo: 'duplicado' | 'ya-tiene' | 'vacio' | 'error' }
 
 /**
- * Guarda el alias de la identidad. Es un `insert` a secas y definitivo: la tabla
- * no tiene permiso de update, así que una vez elegido nadie puede pisarlo.
- *
- * La IP se guarda sólo como referencia de la conexión desde la que se eligió;
- * no se usa para identificar al jugador.
+ * Guarda el alias elegido, creando el grupo propio del dispositivo
+ * (`grupo = playerid`). La policy de Supabase sólo admite esa forma: nadie puede
+ * insertarse en el grupo de otro, y sin permiso de update el alias es definitivo.
  */
 export const guardarAlias = async (
   playerId: string,
@@ -165,23 +222,28 @@ export const guardarAlias = async (
   const alias = aliasIngresado.trim()
 
   // Requisito: no se permite continuar con un alias vacío o de sólo espacios.
+  // La policy valida lo mismo del lado del servidor.
   if (!alias) return { ok: false, motivo: 'vacio' }
 
   const ip = await obtenerIpActual()
 
-  const { error } = await supabase.from('player_aliases').insert({ playerid: playerId, alias, ip })
+  const { error } = await supabase
+    .from('player_aliases')
+    .insert({ playerid: playerId, alias, ip, grupo: playerId })
 
   if (!error) {
     guardarAliasLocal(alias)
-    // Ya hay alias propio: no tiene sentido heredar otra identidad.
     cerrarAdopcion()
+    invalidarCacheIdentidades()
 
     return { ok: true }
   }
 
-  // 23505 = unique_violation. Puede ser por la clave primaria (esta identidad ya
-  // eligió alias desde otra pestaña) o por el índice único del alias.
+  // 23505 = unique_violation: por la clave primaria (esta identidad ya eligió
+  // alias desde otra pestaña) o por el índice único del alias (ya lo usa otro).
   if (error.code === '23505') {
+    invalidarCacheIdentidades()
+
     const propio = await obtenerAliasDePlayer(playerId)
 
     return { ok: false, motivo: propio.alias ? 'ya-tiene' : 'duplicado' }

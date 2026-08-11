@@ -18,7 +18,7 @@ import type {
   RankingResult,
 } from '../lib/rankingHelpers'
 import {
-  intentarAdoptarIdentidad,
+  intentarVincularIdentidad,
   obtenerAliasDePlayer,
   obtenerAliasLocal,
 } from '../lib/aliasHelpers'
@@ -550,7 +550,7 @@ const RankingBoard = () => {
 
       if (consulta.alias) return
 
-      const heredado = await intentarAdoptarIdentidad()
+      const heredado = await intentarVincularIdentidad(playerId)
 
       if (!activo) return
 
@@ -560,7 +560,7 @@ const RankingBoard = () => {
         return
       }
 
-      setPlayerSinAlias(obtenerPlayerId())
+      setPlayerSinAlias(playerId)
     }
 
     revisarAlias()

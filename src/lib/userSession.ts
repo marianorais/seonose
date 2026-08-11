@@ -20,23 +20,52 @@ export const saveLocalUserId = (userId: number) => {
 }
 
 /**
- * Obtiene información del cliente (IP pública y userAgent).
- * Si falla la petición externa, devuelve la userAgent y `ip: null`.
+ * Cuánto se espera como máximo la IP pública.
+ *
+ * `api.ipify.org` está en las listas de los bloqueadores de contenido, muy
+ * habituales en Safari de iOS. Un bloqueador puede dejar la request colgada en
+ * lugar de rechazarla, y sin este límite el `await` no resolvía nunca: la
+ * partida quedaba sin guardarse. La IP es un dato accesorio —la identidad del
+ * jugador no depende de ella—, así que nunca debe bloquear nada.
  */
-export const getClientInfo = async () => {
-  try {
-    const response = await fetch('https://api.ipify.org?format=json')
+const TIMEOUT_IP_MS = 2500
 
-    const data = await response.json()
+/** Cachea el resultado: es el mismo durante toda la carga de la página. */
+let clientInfoEnCurso: Promise<{ ip: string | null; userAgent: string }> | null = null
 
-    return {
-      ip: data.ip as string,
-      userAgent: navigator.userAgent,
+/**
+ * Obtiene información del cliente (IP pública y userAgent).
+ * Si la petición externa falla, la bloquean o tarda demasiado, devuelve la
+ * userAgent y `ip: null`. Nunca lanza y nunca queda colgada.
+ */
+export const getClientInfo = () => {
+  if (clientInfoEnCurso) return clientInfoEnCurso
+
+  clientInfoEnCurso = (async () => {
+    const userAgent = navigator.userAgent
+
+    try {
+      const controller = new AbortController()
+      const timeout = window.setTimeout(() => controller.abort(), TIMEOUT_IP_MS)
+
+      try {
+        const response = await fetch('https://api.ipify.org?format=json', {
+          signal: controller.signal,
+        })
+
+        if (!response.ok) return { ip: null, userAgent }
+
+        const data = await response.json()
+        const ip = typeof data?.ip === 'string' && data.ip ? data.ip : null
+
+        return { ip, userAgent }
+      } finally {
+        window.clearTimeout(timeout)
+      }
+    } catch {
+      return { ip: null, userAgent }
     }
-  } catch {
-    return {
-      ip: null,
-      userAgent: navigator.userAgent,
-    }
-  }
+  })()
+
+  return clientInfoEnCurso
 }

@@ -96,6 +96,29 @@ export const limpiarEstadoQuiz = () => {
   }
 }
 
+/**
+ * ¿Este dispositivo ya terminó alguna partida?
+ *
+ * El historial se escribe en `localStorage` al terminar cada partida, antes de
+ * intentar guardarla en Supabase, así que es una prueba local y confiable de que
+ * el dispositivo ya usó la app. Se usa como requisito para heredar una identidad
+ * previa: sin esta prueba, un visitante nuevo podría quedarse con la cuenta de
+ * otro sólo por compartir la IP de salida.
+ */
+export const tieneHistorialLocal = () => {
+  try {
+    const crudo = window.localStorage.getItem(CLAVE_HISTORIAL_RESULTADOS)
+
+    if (!crudo) return false
+
+    const historial = JSON.parse(crudo)
+
+    return Array.isArray(historial) && historial.length > 0
+  } catch {
+    return false
+  }
+}
+
 export const guardarResultadoEnHistorial = (answers: any[]) => {
   try {
     const correctCount = answers.filter((a) => a.isCorrect).length

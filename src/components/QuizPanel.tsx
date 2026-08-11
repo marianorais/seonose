@@ -5,7 +5,12 @@ import ShareModal from './ShareModal'
 import { supabase } from '../lib/supabase'
 
 import { getClientInfo } from '../lib/userSession'
-import { cerrarAdopcion, obtenerPlayerId } from '../lib/playerIdentity'
+import {
+  cerrarAdopcion,
+  obtenerPlayerId,
+  registrarIpPropia,
+  registrarSesionPropia,
+} from '../lib/playerIdentity'
 import { MOSTRAR_ACCESO_RANKING } from '../lib/featureFlags'
 import {
   normalizar,
@@ -86,15 +91,20 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
 
     const saveCompletedGame = async (finalAnswers: Answer[]) => {
       try {
-        const clientInfo = await getClientInfo()
-
-        // La identidad del jugador ya no depende de la IP, así que una partida se
-        // guarda aunque el servicio de IP falle o esté bloqueado (habitual en
-        // móvil con bloqueadores). Antes, en ese caso, la partida se perdía.
+        // La identidad se lee del dispositivo, sin red: la partida se puede
+        // guardar aunque no haya IP.
         const playerId = obtenerPlayerId()
 
         // Hay partida guardada con este id: cambiarlo la dejaría huérfana.
         cerrarAdopcion()
+
+        // La IP es un dato accesorio y su servicio puede estar bloqueado (típico
+        // en Safari de iOS con bloqueador). `getClientInfo` tiene timeout propio,
+        // así que como mucho demora unos segundos y sigue con `ip: null`. Nunca
+        // debe impedir que la partida se guarde.
+        const clientInfo = await getClientInfo()
+
+        registrarIpPropia(clientInfo.ip)
 
         const correctCount = finalAnswers.filter((a) => a.isCorrect).length
 
@@ -115,10 +125,11 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
           playerid: playerId,
         })
 
-        if (sessionError) {
-          // Si la columna `playerid` todavía no existe (migración sin correr), la
-          // partida se guarda igual con el formato anterior.
-          console.warn('Reintentando guardar la partida sin playerid:', sessionError.message)
+        // Se reintenta SÓLO si la columna `playerid` no existe todavía (migración
+        // sin correr). Ante cualquier otro error no se reintenta, para no
+        // insertar la misma partida dos veces.
+        if (sessionError && /playerid/i.test(sessionError.message ?? '')) {
+          console.warn('Guardando la partida sin playerid:', sessionError.message)
           ;({ data: gameSession, error: sessionError } = await insertarSesion(datosSesion))
         }
 
@@ -126,6 +137,10 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
           console.error('Error creando sesión', sessionError)
           return
         }
+
+        // Anota la partida como propia. Es la referencia exacta que le permite al
+        // ranking reconocerla como suya aunque cambie de IP o falte la migración.
+        registrarSesionPropia(gameSession.id)
 
         const answersToInsert = finalAnswers.map((answer) => ({
           gamesessionid: gameSession.id,

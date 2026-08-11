@@ -24,6 +24,13 @@
 const CLAVE_PLAYER_ID = 'seonose-player-id'
 /** Marca que el id se acaba de crear y todavía puede heredar una identidad. */
 const CLAVE_ADOPCION_PENDIENTE = 'seonose-adopcion-pendiente'
+/** Ids de `game_sessions` que este dispositivo guardó. */
+const CLAVE_MIS_SESIONES = 'seonose-mis-sesiones'
+/** IPs desde las que este dispositivo jugó, para reconocer partidas viejas. */
+const CLAVE_MIS_IPS = 'seonose-mis-ips'
+
+const MAX_SESIONES_GUARDADAS = 400
+const MAX_IPS_GUARDADAS = 30
 
 const DIAS_COOKIE = 3650
 
@@ -180,4 +187,59 @@ export const cerrarAdopcion = () => {
 export const adoptarPlayerId = (playerId: string) => {
   persistir(playerId)
   cerrarAdopcion()
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pertenencia explícita de las partidas                                      */
+/*                                                                            */
+/* El dispositivo anota el id de cada partida que guarda. Es la forma exacta   */
+/* de saber qué partidas son suyas: no depende de la IP (que en móvil rota ni  */
+/* bien se refresca la página) ni de que la migración de la base esté corrida. */
+/* Con esto el ranking puede reagrupar esas partidas bajo la identidad actual  */
+/* aunque se hayan guardado con otra clave.                                   */
+/* -------------------------------------------------------------------------- */
+
+const leerLista = <T,>(clave: string): T[] => {
+  try {
+    const crudo = leerStorage(clave)
+
+    if (!crudo) return []
+
+    const parseado = JSON.parse(crudo)
+
+    return Array.isArray(parseado) ? (parseado as T[]) : []
+  } catch {
+    return []
+  }
+}
+
+const guardarLista = (clave: string, valores: unknown[], maximo: number) => {
+  // Se conservan los últimos: son los que pueden caer en el rango del ranking.
+  escribirStorage(clave, JSON.stringify(valores.slice(-maximo)))
+}
+
+export const obtenerSesionesPropias = (): number[] =>
+  leerLista<number>(CLAVE_MIS_SESIONES).filter((id) => Number.isFinite(id))
+
+export const registrarSesionPropia = (sessionId: number) => {
+  if (!Number.isFinite(sessionId)) return
+
+  const actuales = obtenerSesionesPropias()
+
+  if (actuales.includes(sessionId)) return
+
+  guardarLista(CLAVE_MIS_SESIONES, [...actuales, sessionId], MAX_SESIONES_GUARDADAS)
+}
+
+export const obtenerIpsPropias = (): string[] =>
+  leerLista<string>(CLAVE_MIS_IPS).filter((ip) => typeof ip === 'string' && ip.length > 0)
+
+export const registrarIpPropia = (ip: string | null) => {
+  if (!ip) return
+
+  const actuales = obtenerIpsPropias()
+
+  if (actuales.includes(ip)) return
+
+  guardarLista(CLAVE_MIS_IPS, [...actuales, ip], MAX_IPS_GUARDADAS)
 }

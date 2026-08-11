@@ -18,8 +18,17 @@
  */
 
 import { supabase } from './supabase'
-import { obtenerAliasPorPlayer } from './aliasHelpers'
-import { ipDeIdLegado, idLegadoDeIp, obtenerPlayerId } from './playerIdentity'
+import { obtenerMapaIdentidades } from './aliasHelpers'
+import {
+  ipDeIdLegado,
+  idLegadoDeIp,
+  obtenerIpsPropias,
+  obtenerPlayerId,
+  obtenerSesionesPropias,
+  registrarSesionPropia,
+} from './playerIdentity'
+import { cargarEstadoGuardado } from './quizHelpers'
+import { getTodayKey } from './appHelpers'
 
 export type RankingPeriod = 'diario' | 'mensual' | 'anual'
 
@@ -429,6 +438,112 @@ const obtenerSesionesDelRango = async (fromIso: string, toIso: string): Promise<
   }))
 }
 
+/** Guarda el día cuya partida ya se reclamó, para no repetir el trabajo. */
+const CLAVE_RECLAMO_HECHO = 'seonose-reclamo-dia'
+
+interface RespuestaLocal {
+  questionId: number
+  userAnswer: string
+  responseTime: number
+}
+
+/** Huella de una partida: qué se contestó a cada pregunta y en cuánto tiempo. */
+const construirHuella = (partes: { pregunta: unknown; respuesta: unknown; tiempo: unknown }[]) =>
+  partes
+    .map(({ pregunta, respuesta, tiempo }) => `${pregunta}|${respuesta}|${tiempo}`)
+    .sort()
+    .join('#')
+
+/**
+ * Recupera la partida de hoy cuando quedó guardada sin la identidad actual.
+ *
+ * Hace falta para las partidas jugadas antes de que existiera el identificador
+ * estable: quedaron atadas a la IP del momento y, en móvil, esa IP ya rotó, así
+ * que no hay forma de reconocerlas por ahí. La partida sí está en la base, y el
+ * dispositivo guarda en `localStorage` las respuestas exactas que dio con sus
+ * tiempos: eso alcanza para identificarla sin ambigüedad.
+ *
+ * Se exige coincidencia exacta de todas las respuestas y que haya un único
+ * candidato; ante cualquier duda no se reclama nada. Corre una vez por día y se
+ * apaga sola en cuanto encuentra la partida.
+ */
+const reclamarPartidaDeHoy = async (fromIso: string, toIso: string) => {
+  const dayKey = getTodayKey()
+
+  const marcarHecho = () => {
+    try {
+      window.localStorage.setItem(CLAVE_RECLAMO_HECHO, dayKey)
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  try {
+    if (window.localStorage.getItem(CLAVE_RECLAMO_HECHO) === dayKey) return
+  } catch {
+    // Sin storage no se puede recordar el reclamo; se intenta igual.
+  }
+
+  const estado = cargarEstadoGuardado<{ answers?: RespuestaLocal[]; finished?: boolean }>(dayKey)
+  const respuestas = estado?.answers
+
+  // Sólo tiene sentido si la partida del día está terminada.
+  if (!estado?.finished || !respuestas?.length) return
+
+  const huellaLocal = construirHuella(
+    respuestas.map((r) => ({ pregunta: r.questionId, respuesta: r.userAnswer, tiempo: r.responseTime }))
+  )
+
+  const { data: candidatas, error } = await supabase
+    .from('game_sessions')
+    .select('id')
+    .gte('completedat', fromIso)
+    .lt('completedat', toIso)
+    .eq('totalquestions', respuestas.length)
+    .limit(MAX_SESSIONS)
+
+  if (error || !candidatas?.length) return
+
+  const ids = (candidatas as { id: number }[]).map((fila) => fila.id)
+  const propias = new Set(obtenerSesionesPropias())
+
+  // Si alguna de las candidatas ya está reconocida, no hay nada que reclamar.
+  if (ids.some((id) => propias.has(id))) {
+    marcarHecho()
+    return
+  }
+
+  const { data: respuestasRemotas, error: errorRespuestas } = await supabase
+    .from('game_answers')
+    .select('gamesessionid,questionid,selectedanswer,responsetime')
+    .in('gamesessionid', ids)
+
+  if (errorRespuestas || !respuestasRemotas) return
+
+  const porSesion = new Map<number, { pregunta: unknown; respuesta: unknown; tiempo: unknown }[]>()
+
+  for (const fila of respuestasRemotas as Record<string, unknown>[]) {
+    const sessionId = Number(fila.gamesessionid)
+
+    if (!Number.isFinite(sessionId)) continue
+
+    const lista = porSesion.get(sessionId) ?? []
+
+    lista.push({ pregunta: fila.questionid, respuesta: fila.selectedanswer, tiempo: fila.responsetime })
+    porSesion.set(sessionId, lista)
+  }
+
+  const coincidencias = [...porSesion.entries()].filter(
+    ([, partes]) => partes.length === respuestas.length && construirHuella(partes) === huellaLocal
+  )
+
+  // Una única coincidencia exacta: es la partida de este dispositivo.
+  if (coincidencias.length !== 1) return
+
+  registrarSesionPropia(coincidencias[0][0])
+  marcarHecho()
+}
+
 /** Suma el tiempo de respuesta por sesión, en lotes para no armar URLs enormes. */
 const obtenerTiemposPorSesion = async (sessionIds: number[]) => {
   const times = new Map<number, { sum: number; count: number }>()
@@ -472,18 +587,53 @@ export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData
   const definition = PERIOD_DEFINITIONS[period]
   const { fromIso, toIso, rangeLabel } = definition.buildRange(obtenerFechaEnArgentina(new Date()))
 
-  const [rows, aliasPorPlayer] = await Promise.all([
+  // Antes de armar la tabla se intenta recuperar la partida de hoy si quedó
+  // guardada sin la identidad actual. Falla en silencio: si no se puede, el
+  // ranking se arma igual.
+  try {
+    await reclamarPartidaDeHoy(fromIso, toIso)
+  } catch (error) {
+    console.warn('No se pudo revisar la partida de hoy:', error)
+  }
+
+  const [rows, mapa] = await Promise.all([
     obtenerSesionesDelRango(fromIso, toIso),
-    obtenerAliasPorPlayer(MAX_ALIASES),
+    obtenerMapaIdentidades(MAX_ALIASES),
   ])
 
-  // Identidad propia: se lee del dispositivo, sin red.
-  const playerIdActual = obtenerPlayerId()
+  const aliasPorPersona = mapa.aliasPorGrupo
 
-  // Una partida cuenta si se la puede atribuir a alguien: por identidad o, en
-  // las que quedaron sin backfill, por IP.
+  /**
+   * Identidad de dispositivo -> persona. Agrupar por persona es lo que hace que
+   * el mismo usuario en varios dispositivos sea UNA fila del ranking en lugar de
+   * competir consigo mismo. Las identidades sin grupo registrado se agrupan por
+   * sí mismas (jugadores anónimos).
+   */
+  const resolverPersona = (identidad: string) =>
+    mapa.grupoPorIdentidad.get(identidad) ?? identidad
+
+  // Identidad propia: todo se lee del dispositivo, sin red.
+  const playerIdActual = obtenerPlayerId()
+  const personaActual = resolverPersona(playerIdActual)
+  const misSesiones = new Set(obtenerSesionesPropias())
+  const misIps = new Set(obtenerIpsPropias())
+
+  /**
+   * Una partida es propia si el dispositivo anotó su id al guardarla, si trae la
+   * identidad actual, o si se guardó desde una IP que este dispositivo usó. Lo
+   * primero es exacto y no depende de la IP ni de que la migración esté corrida:
+   * es lo que hace que el ranking no pierda partidas en móvil, donde la IP rota
+   * entre una carga de página y la siguiente.
+   */
+  const esSesionPropia = (row: SessionRow) =>
+    misSesiones.has(row.id) ||
+    (row.playerid !== null && row.playerid === playerIdActual) ||
+    (row.userip !== null && misIps.has(row.userip))
+
+  // Una partida cuenta si se la puede atribuir a alguien: por identidad, por IP,
+  // o porque este dispositivo la reconoce como suya.
   const playableRows = rows.filter(
-    (row) => (row.playerid || row.userip) && (row.totalquestions ?? 0) > 0
+    (row) => (row.playerid || row.userip || misSesiones.has(row.id)) && (row.totalquestions ?? 0) > 0
   )
 
   const emptyData: RankingData = {
@@ -499,15 +649,23 @@ export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData
 
   const times = await obtenerTiemposPorSesion(playableRows.map((row) => row.id))
 
-  // La identidad es la clave del jugador: todas sus partidas del período caen en
-  // la misma fila del ranking, tenga alias elegido o no.
-  const esJugadorActual = (playerKey: string) => playerKey === playerIdActual
+  // La persona es la clave del jugador: todas sus partidas del período caen en la
+  // misma fila del ranking, en cuantos dispositivos las haya jugado.
+  const esJugadorActual = (playerKey: string) => playerKey === personaActual
 
   const accumulators = new Map<string, PlayerAccumulator>()
 
   for (const row of playableRows) {
-    // Si el backfill no corrió, se deriva la misma clave que habría dejado.
-    const playerKey = row.playerid ?? idLegadoDeIp(row.userip as string)
+    // Las partidas propias se reagrupan bajo la identidad actual, sin importar
+    // con qué clave se guardaron: así todas caen en una sola fila del ranking en
+    // lugar de quedar repartidas entre las IPs que fue teniendo el dispositivo.
+    // Para el resto, si el backfill no corrió se deriva la clave que habría dejado.
+    const identidad = esSesionPropia(row)
+      ? playerIdActual
+      : row.playerid ?? idLegadoDeIp(row.userip as string)
+
+    // Y de la identidad del dispositivo se pasa a la persona dueña.
+    const playerKey = resolverPersona(identidad)
 
     const accumulator =
       accumulators.get(playerKey) ??
@@ -535,7 +693,7 @@ export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData
     // El alias generado se deriva de la IP en las identidades heredadas, para
     // que los jugadores anónimos de antes conserven el nombre que ya tenían.
     const identity = construirIdentidad(ipDeIdLegado(accumulator.playerKey))
-    const aliasElegido = aliasPorPlayer.get(accumulator.playerKey)
+    const aliasElegido = aliasPorPersona.get(accumulator.playerKey)
 
     return {
       // Hash: `playerKey` termina como `key` en el DOM y no debe filtrar la IP.

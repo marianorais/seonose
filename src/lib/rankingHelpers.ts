@@ -544,6 +544,55 @@ const reclamarPartidaDeHoy = async (fromIso: string, toIso: string) => {
   marcarHecho()
 }
 
+/**
+ * Repara las partidas propias que quedaron guardadas sin identidad.
+ *
+ * Por qué puede pasar: si al insertar la partida la columna `playerid` no estaba
+ * disponible (típicamente por el caché de esquema de PostgREST justo después de
+ * agregarla), la partida se guarda igual pero sin dueño. Y como ningún otro
+ * proceso vuelve a escribir esa columna, quedaría huérfana para siempre.
+ *
+ * Sólo se reparan partidas cuyo id anotó este mismo dispositivo al guardarlas, y
+ * la función de Postgres sólo escribe si `playerid` sigue en NULL: es imposible
+ * pisar la identidad de otro jugador.
+ *
+ * No bloquea el armado del ranking: la tabla ya se muestra bien igual, porque el
+ * dispositivo reconoce sus partidas por id.
+ */
+const repararSesionesSinIdentidad = async (
+  rows: SessionRow[],
+  misSesiones: Set<number>,
+  playerId: string
+) => {
+  // Se acepta cualquier valor vacío, no sólo `null`: la columna puede llegar
+  // ausente o en blanco según por dónde se leyó la fila.
+  const huerfanas = rows.filter((row) => !row.playerid && misSesiones.has(row.id))
+
+  if (huerfanas.length === 0) return
+
+  const resultados = await Promise.all(
+    huerfanas.map(async (row) => {
+      const { data, error } = await supabase.rpc('reclamar_partida', {
+        p_sessionid: row.id,
+        p_playerid: playerId,
+      })
+
+      if (error) {
+        console.warn(`No se pudo reparar la partida ${row.id}:`, error.message)
+        return false
+      }
+
+      return (data as { estado?: string } | null)?.estado === 'ok'
+    })
+  )
+
+  const reparadas = resultados.filter(Boolean).length
+
+  if (reparadas > 0) {
+    console.info(`Identidad reparada en ${reparadas} partida(s) propia(s).`)
+  }
+}
+
 /** Suma el tiempo de respuesta por sesión, en lotes para no armar URLs enormes. */
 const obtenerTiemposPorSesion = async (sessionIds: number[]) => {
   const times = new Map<number, { sum: number; count: number }>()
@@ -629,6 +678,10 @@ export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData
     misSesiones.has(row.id) ||
     (row.playerid !== null && row.playerid === playerIdActual) ||
     (row.userip !== null && misIps.has(row.userip))
+
+  // Cierra el agujero de raíz: si alguna partida propia quedó sin identidad, se
+  // le escribe ahora. En segundo plano, porque la tabla ya se arma bien sin esto.
+  void repararSesionesSinIdentidad(rows, misSesiones, playerIdActual)
 
   // Una partida cuenta si se la puede atribuir a alguien: por identidad, por IP,
   // o porque este dispositivo la reconoce como suya.

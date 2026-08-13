@@ -127,19 +127,24 @@ const persistir = (id: string) => {
 const leerIdGuardado = () => leerStorage(CLAVE_PLAYER_ID) ?? leerCookie(CLAVE_PLAYER_ID)
 
 /**
- * Identificador del jugador. Siempre devuelve un valor: la primera vez lo crea.
- * Es sincrónico a propósito, para que quien lo necesite no tenga que esperar red.
+ * Identificador del jugador. **Nunca devuelve vacío**: si no hay ninguno
+ * guardado, lo crea. Es sincrónico a propósito, para que quien lo necesite no
+ * tenga que esperar red.
+ *
+ * La garantía de no-vacío es importante: si esta función devolviera `null` o
+ * `undefined`, la partida se guardaría con `playerid = NULL` **sin ningún
+ * error** —el insert es válido— y quedaría sin dueño de forma silenciosa.
  */
 export const obtenerPlayerId = (): string => {
   const guardado = leerIdGuardado()
 
-  if (guardado) {
+  if (guardado && guardado.trim()) {
     // Reescribe los dos canales: repara el que se haya perdido.
     persistir(guardado)
     return guardado
   }
 
-  if (idEnMemoria) {
+  if (idEnMemoria && idEnMemoria.trim()) {
     persistir(idEnMemoria)
     return idEnMemoria
   }
@@ -152,6 +157,29 @@ export const obtenerPlayerId = (): string => {
   escribirCookie(CLAVE_ADOPCION_PENDIENTE, '1')
 
   return nuevo
+}
+
+/**
+ * Diagnóstico de persistencia para este dispositivo.
+ *
+ * Si ningún canal persiste, el identificador se regenera en cada carga: la
+ * partida se guarda con identidad (nunca en NULL) pero el jugador no puede
+ * acumular historial ni conservar un alias. No hay forma de arreglar eso desde
+ * el código —es una limitación del navegador—, pero sí de detectarlo.
+ */
+export const diagnosticarPersistencia = () => {
+  const id = obtenerPlayerId()
+
+  const enStorage = leerStorage(CLAVE_PLAYER_ID)
+  const enCookie = leerCookie(CLAVE_PLAYER_ID)
+
+  return {
+    id,
+    localStorage: enStorage === id,
+    cookie: enCookie === id,
+    /** `false` = la identidad se va a perder al recargar la página. */
+    persiste: enStorage === id || enCookie === id,
+  }
 }
 
 /**

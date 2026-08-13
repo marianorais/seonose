@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase'
 import { getClientInfo } from '../lib/userSession'
 import {
   cerrarAdopcion,
-  obtenerPlayerId,
+  diagnosticarPersistencia,
   registrarIpPropia,
   registrarSesionPropia,
 } from '../lib/playerIdentity'
@@ -93,7 +93,19 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
       try {
         // La identidad se lee del dispositivo, sin red: la partida se puede
         // guardar aunque no haya IP.
-        const playerId = obtenerPlayerId()
+        const persistencia = diagnosticarPersistencia()
+        const playerId = persistencia.id
+
+        if (!persistencia.persiste) {
+          // Ni localStorage ni cookies retienen nada en este navegador. La
+          // partida se guarda con identidad, pero al recargar va a ser otra: el
+          // jugador no puede acumular historial. Se deja constancia para poder
+          // diagnosticarlo desde la consola del dispositivo afectado.
+          console.warn(
+            'Este navegador no conserva la identidad (localStorage y cookies bloqueados). ' +
+              'La partida se guarda igual, pero el historial no se va a poder acumular.'
+          )
+        }
 
         // Hay partida guardada con este id: cambiarlo la dejaría huérfana.
         cerrarAdopcion()
@@ -120,16 +132,29 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
         const insertarSesion = (payload: Record<string, unknown>) =>
           supabase.from('game_sessions').insert(payload).select().single()
 
-        let { data: gameSession, error: sessionError } = await insertarSesion({
-          ...datosSesion,
-          playerid: playerId,
-        })
+        const conIdentidad = { ...datosSesion, playerid: playerId }
 
-        // Se reintenta SÓLO si la columna `playerid` no existe todavía (migración
-        // sin correr). Ante cualquier otro error no se reintenta, para no
-        // insertar la misma partida dos veces.
+        let { data: gameSession, error: sessionError } = await insertarSesion(conIdentidad)
+
+        /*
+         * Si el error menciona `playerid`, casi siempre es el caché de esquema de
+         * PostgREST: después de agregar la columna, la API sigue un rato con el
+         * esquema viejo y responde "Could not find the 'playerid' column ... in
+         * the schema cache". Es transitorio, así que se reintenta CON identidad
+         * antes de resignarla: guardar sin `playerid` deja la partida sin dueño
+         * de forma permanente, porque nada vuelve a escribir esa columna.
+         */
         if (sessionError && /playerid/i.test(sessionError.message ?? '')) {
-          console.warn('Guardando la partida sin playerid:', sessionError.message)
+          console.warn('Reintentando con identidad (posible caché de esquema):', sessionError.message)
+
+          await new Promise((resolve) => window.setTimeout(resolve, 800))
+          ;({ data: gameSession, error: sessionError } = await insertarSesion(conIdentidad))
+        }
+
+        // Último recurso: la columna sigue inaccesible. Se guarda la partida
+        // —nunca se pierde— y la verificación de más abajo le asigna la identidad.
+        if (sessionError && /playerid/i.test(sessionError.message ?? '')) {
+          console.error('Guardando la partida sin la columna playerid:', sessionError.message)
           ;({ data: gameSession, error: sessionError } = await insertarSesion(datosSesion))
         }
 
@@ -139,8 +164,50 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
         }
 
         // Anota la partida como propia. Es la referencia exacta que le permite al
-        // ranking reconocerla como suya aunque cambie de IP o falte la migración.
+        // ranking reconocerla como suya aunque cambie de IP o falte la migración,
+        // y lo que habilita repararla si quedó sin identidad.
         registrarSesionPropia(gameSession.id)
+
+        /*
+         * Verificación por RESULTADO, no por causa.
+         *
+         * En lugar de intentar anticipar por qué la identidad podría no quedar
+         * escrita, se mira la fila que devolvió la base. Si no tiene `playerid`,
+         * se lo asigna con `reclamar_partida`, sin importar el motivo:
+         *
+         *  - se envió una identidad vacía (el insert NO da error: entra NULL en
+         *    silencio, y por eso reintentar según el mensaje de error no servía);
+         *  - la API rechazó la columna (caché de esquema desactualizado);
+         *  - falta el permiso sobre la columna;
+         *  - cualquier causa todavía no diagnosticada.
+         *
+         * La función corre dentro de Postgres y sólo expone su firma, así que
+         * sigue funcionando incluso cuando el insert no puede escribir la columna.
+         */
+        const filaGuardada = gameSession as { id: number; playerid?: string | null }
+
+        if (!filaGuardada.playerid) {
+          console.warn(
+            `Partida ${filaGuardada.id} quedó sin identidad. Identidad local: ${JSON.stringify(playerId)}. Asignando...`
+          )
+
+          const { data: reparacion, error: errorReparacion } = await supabase.rpc('reclamar_partida', {
+            p_sessionid: filaGuardada.id,
+            p_playerid: playerId,
+          })
+
+          const estado = (reparacion as { estado?: string } | null)?.estado
+
+          if (errorReparacion || (estado !== 'ok' && estado !== 'no-aplica')) {
+            // Queda anotada: el ranking lo reintenta en la próxima visita.
+            console.error(
+              `No se pudo asignar la identidad a la partida ${filaGuardada.id}; se reintentará al abrir el ranking.`,
+              errorReparacion?.message ?? estado
+            )
+          } else {
+            console.info(`Identidad asignada a la partida ${filaGuardada.id}.`)
+          }
+        }
 
         const answersToInsert = finalAnswers.map((answer) => ({
           gamesessionid: gameSession.id,

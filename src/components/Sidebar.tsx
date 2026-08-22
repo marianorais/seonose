@@ -1,11 +1,50 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+
+import { MOSTRAR_ACCESO_RANKING } from '../lib/featureFlags'
 
 interface SidebarProps {
   isOpen: boolean
   onClose: () => void
 }
 
+interface EnlaceNavProps {
+  to: string
+  onClose: () => void
+  /** `ranking` usa el acento ámbar, el mismo que el acceso del header. */
+  tono?: 'neutro' | 'ranking'
+  activo: boolean
+  children: React.ReactNode
+}
+
+/**
+ * Fila de navegación del menú. Se extrajo porque los tres enlaces compartían la
+ * misma lista de clases; acá se define una sola vez y cada uno elige su tono.
+ */
+const EnlaceNav = ({ to, onClose, tono = 'neutro', activo, children }: EnlaceNavProps) => {
+  const estilos = {
+    neutro: activo
+      ? 'border-gray-300 bg-gray-100 text-gray-900'
+      : 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50',
+    ranking: activo
+      ? 'border-amber-400 bg-amber-100 text-amber-900'
+      : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100',
+  }[tono]
+
+  return (
+    <Link
+      to={to}
+      onClick={onClose}
+      aria-current={activo ? 'page' : undefined}
+      className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-medium transition ${estilos}`}
+    >
+      {children}
+    </Link>
+  )
+}
+
 const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
+  const { pathname } = useLocation()
+
   if (!isOpen) return null
 
   return (
@@ -23,13 +62,23 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           <div className="space-y-3">
             <h3 className="text-xs uppercase tracking-widest text-gray-500">Navegación</h3>
             <div className="space-y-2">
-              <Link
-                to="/"
-                onClick={onClose}
-                className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm font-medium text-gray-800 transition hover:bg-gray-50"
-              >
+              <EnlaceNav to="/" onClose={onClose} activo={pathname === '/'}>
                 🏠 Inicio
-              </Link>
+              </EnlaceNav>
+
+              {/*
+                El ranking es un destino, así que va en Navegación y no al final.
+                Lleva el mismo acento ámbar que el acceso del header: mismo color,
+                mismo lugar al que se llega.
+              */}
+              {MOSTRAR_ACCESO_RANKING && (
+                <>
+                  <EnlaceNav to="/ranking" onClose={onClose} tono="ranking" activo={pathname === '/ranking'}>
+                    🏆 Ranking general
+                  </EnlaceNav>
+                  <p className="text-xs text-gray-500">Mirá en qué puesto estás y quién te está ganando.</p>
+                </>
+              )}
             </div>
           </div>
 
@@ -43,13 +92,9 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
           <div className="space-y-3">
             <h3 className="text-xs uppercase tracking-widest text-gray-500">Contacto</h3>
-            <Link
-              to="/contacto"
-              onClick={onClose}
-              className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm font-medium text-gray-800 transition hover:bg-gray-50"
-            >
+            <EnlaceNav to="/contacto" onClose={onClose} activo={pathname === '/contacto'}>
               ✉️ Contáctenos
-            </Link>
+            </EnlaceNav>
             <p className="text-xs text-gray-500">Envianos tus sugerencias de mejora.</p>
           </div>
         </div>

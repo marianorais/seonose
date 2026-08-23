@@ -639,7 +639,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Pregunta {currentIndex + 1} de {questions.length}</p>
             <div className="mt-3 flex items-center justify-center gap-3">
               {renderCategoryBadge(currentQuestion)}
-              <h2 className="text-xl font-bold leading-tight text-slate-900 sm:text-3xl text-center">{currentQuestion?.question}</h2>
+              <h2 className="text-2xl font-bold leading-tight text-slate-900 sm:text-3xl text-center">{currentQuestion?.question}</h2>
             </div>
           </div>
         </div>

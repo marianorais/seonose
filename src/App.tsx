@@ -64,6 +64,9 @@ const FALLBACK_QUESTIONS: QuestionItem[] = [
 import { getTodayKey, loadCustomSettings, selectDailyQuestions } from './lib/appHelpers'
 
 function App() {
+  // Durante una pregunta el layout pasa a alto fijo y el header se compacta,
+  // para que la pregunta y las opciones entren sin scroll.
+  const [partidaActiva, setPartidaActiva] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
@@ -317,7 +320,9 @@ function App() {
 
   return (
     <div
-      className="min-h-screen transition-colors duration-300"
+      className={`transition-colors duration-300 ${
+        partidaActiva ? "app-jugando" : "min-h-screen"
+      }`}
       style={{
         backgroundColor: gameSettings?.backgroundcolor ?? themeConfig.backgroundColor ?? '#f8fafc',
 
@@ -325,19 +330,25 @@ function App() {
       }}
     >
       <Header
+        compacto={partidaActiva}
         onOpenSidebar={() => setShowSidebar(true)}
         onOpenSettings={() => setShowSettings(true)}
         onOpenStats={() => setShowStats(true)}
       />
 
-      <main className="mx-auto flex w-full max-w-3xl flex-col items-center justify-start px-4 py-5 lg:px-8">
+      <main
+        className={`mx-auto flex w-full max-w-3xl flex-col items-center justify-start lg:px-8 ${
+          partidaActiva ? "main-jugando px-3 py-2" : "px-4 py-5"
+        }`}
+      >
         {loading ? (
           <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600">
             Cargando contenido...
           </div>
         ) : (
-          <div className="w-full space-y-4">
+          <div className={partidaActiva ? "flex w-full min-h-0 flex-1 flex-col" : "w-full space-y-4"}>
             <QuizPanel
+              onPartidaActivaChange={setPartidaActiva}
               questions={questions}
               settings={settings}
               questionDate={questionDate}

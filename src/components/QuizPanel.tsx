@@ -47,6 +47,12 @@ interface Answer {
 }
 
 interface QuizPanelProps {
+  /**
+   * Avisa si hay una pregunta en curso (no la pantalla de resultados). El
+   * contenedor lo usa para compactar el header y fijar la altura del juego.
+   * Es sólo presentación: no interviene en la logica de la partida.
+   */
+  onPartidaActivaChange?: (activa: boolean) => void
   questions: QuestionItem[]
   settings: QuestionSettings | null
   questionDate: string
@@ -58,7 +64,7 @@ interface QuizPanelProps {
  * y guarda resultados en `localStorage` y Supabase. Mantiene la lógica
  * original, solo se ha modularizado el código.
  */
-const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanelProps) => {
+const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaActivaChange }: QuizPanelProps) => {
     const savedState = typeof window !== 'undefined' ? cargarEstadoGuardado<SavedQuizState>(questionDate) : null
 
     const gameNumber = useMemo(() => obtenerNumeroPartida(), [])
@@ -277,6 +283,13 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
         resetQuiz()
       }
     }, [questionDate, settings, resetQuiz])
+
+    // Partida en curso = hay preguntas cargadas y todavia no se termino.
+    const partidaActiva = Boolean(settings) && questions.length > 0 && !finished
+
+    useEffect(() => {
+      onPartidaActivaChange?.(partidaActiva)
+    }, [partidaActiva, onPartidaActivaChange])
 
     useEffect(() => {
       if (!settings || finished || !currentQuestion || showFeedback) return
@@ -634,60 +647,86 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay }: QuizPanel
 
     const esCorrecta = normalizar(tempAnswer) === normalizar(currentQuestion.answer)
 
+    /**
+     * Colores de cada recuadro. Mientras se responde sólo marca el elegido; al
+     * mostrar el resultado tiñe la correcta en verde y, si erró, la elegida en
+     * rojo. Las demás se atenúan, como hacía antes con `opacity-50`.
+     */
+    const colorOpcion = (choice: string) => {
+      const elegida = normalizar(choice) === normalizar(tempAnswer)
+      const correcta = normalizar(choice) === normalizar(currentQuestion.answer)
+
+      if (!showFeedback) {
+        return elegida
+          ? 'border-sky-600 bg-sky-50 text-slate-900 shadow-sm'
+          : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50'
+      }
+
+      if (correcta) return 'border-green-600 bg-green-50 text-green-900'
+      if (elegida) return 'border-red-600 bg-red-50 text-red-900'
+
+      return 'border-slate-300 bg-white text-slate-900 opacity-50'
+    }
+
     return (
-      <div className="w-full quiz-viewport">
-        {/*
-          Barra superior: categoría · progreso · contador, en una sola línea.
-          Reutiliza la caja gris que antes envolvía sólo al contador, así que el
-          estilo es el mismo de siempre; lo único que cambia es el ordenamiento.
-        */}
-        <div className="flex items-center justify-between gap-3 rounded-[2rem] bg-slate-100 px-4 py-3">
+      <div className="quiz-viewport">
+        {/* Barra de contexto: categoría · progreso · contador, en una sola fila baja. */}
+        <div className="quiz-topbar">
           {renderCategoryBadge(currentQuestion)}
 
-          <p className="min-w-0 flex-1 text-center text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
+          <p className="quiz-progreso">
             Pregunta {currentIndex + 1} de {questions.length}
           </p>
 
-          <span
-            role="timer"
-            aria-label={`Quedan ${secondsLeft} segundos`}
-            className="shrink-0 rounded-[1.5rem] bg-white px-3 py-2 text-2xl font-bold text-slate-900 shadow-sm"
-          >
+          <span role="timer" aria-label={`Quedan ${secondsLeft} segundos`} className="quiz-timer">
             {secondsLeft}
           </span>
         </div>
 
-        <div className="mx-auto w-full max-w-4xl">
-          <h2 className="text-2xl font-bold leading-tight text-slate-900 sm:text-3xl text-center">
-            {currentQuestion?.question}
-          </h2>
-        </div>
+        <h2 className="quiz-question">{currentQuestion?.question}</h2>
 
-        <div className="grid gap-3 md:grid-cols-2 choices-grid">
-          {currentQuestion.choices?.map((choice) => {
-            const isSelected = normalizar(choice) === normalizar(tempAnswer)
+        {/*
+          Área principal. Las respuestas conservan su alto por contenido, así que
+          NO se mueven al responder: la tarjeta de resultado aparece en el espacio
+          libre que queda debajo. Si el conjunto no entra, scrollea sólo esta zona
+          —nunca la página— y el botón queda pegado abajo por el `sticky`.
+        */}
+        <div className="quiz-main">
+          <div className="choices-grid">
+            {currentQuestion.choices?.map((choice) => {
+              const isSelected = normalizar(choice) === normalizar(tempAnswer)
 
-            return (
-              <button key={choice} type="button" onClick={() => handleChoice(choice)} disabled={showFeedback} aria-pressed={isSelected} style={{ fontSize: '1.35rem' }} className={`rounded-[1.75rem] border px-4 py-3 text-left text-base font-semibold leading-6 transition ${isSelected ? 'border-sky-600 bg-sky-50 text-slate-900 shadow-sm' : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50'} min-h-[3.6rem] ${showFeedback ? 'cursor-not-allowed opacity-50' : ''}`}>
-                {choice}
-              </button>
-            )
-          })}
-        </div>
-
-        {showFeedback && (
-          <div className="quiz-actions rounded-3xl border border-gray-200 bg-white p-6 shadow-sm" aria-live="polite">
-            <div className="space-y-4">
-              <div className="text-center">
-                <p className="text-lg font-semibold text-gray-900">{esCorrecta ? '¡Correcto!' : 'Incorrecto'}</p>
-                <p className="mt-2 text-lg text-gray-600">Tu respuesta:{' '}<span className={esCorrecta ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>{tempAnswer || 'Sin respuesta'}</span></p>
-                {!esCorrecta && (<p className="mt-2 text-lg text-gray-600">Respuesta correcta:{' '}<span className="text-green-600 font-semibold">{currentQuestion.answer}</span></p>)}
-              </div>
-
-              <button type="button" onClick={handleNext} className="w-full rounded-[1.75rem] bg-slate-900 px-5 py-4 text-base font-semibold text-white transition hover:bg-slate-700">{currentIndex + 1 >= questions.length ? 'Ver resultados' : 'Siguiente pregunta'}</button>
-            </div>
+              return (
+                <button
+                  key={choice}
+                  type="button"
+                  onClick={() => handleChoice(choice)}
+                  disabled={showFeedback}
+                  aria-pressed={isSelected}
+                  className={`choice-button ${colorOpcion(choice)} ${showFeedback ? 'cursor-not-allowed' : ''}`}
+                >
+                  {choice}
+                </button>
+              )
+            })}
           </div>
-        )}
+
+          {showFeedback && (
+            <div className="quiz-feedback" aria-live="polite">
+              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <p className="text-lg font-semibold text-gray-900">{esCorrecta ? '¡Correcto!' : 'Incorrecto'}</p>
+                    <p className="mt-2 text-lg text-gray-600">Tu respuesta:{' '}<span className={esCorrecta ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>{tempAnswer || 'Sin respuesta'}</span></p>
+                    {!esCorrecta && (<p className="mt-2 text-lg text-gray-600">Respuesta correcta:{' '}<span className="text-green-600 font-semibold">{currentQuestion.answer}</span></p>)}
+                  </div>
+
+                  <button type="button" onClick={handleNext} className="w-full rounded-[1.75rem] bg-slate-900 px-5 py-4 text-base font-semibold text-white transition hover:bg-slate-700">{currentIndex + 1 >= questions.length ? 'Ver resultados' : 'Siguiente pregunta'}</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     )
   }

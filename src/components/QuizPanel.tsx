@@ -49,8 +49,8 @@ interface Answer {
 interface QuizPanelProps {
   /**
    * Avisa si hay una pregunta en curso (no la pantalla de resultados). El
-   * contenedor lo usa para compactar el header y fijar la altura del juego.
-   * Es sólo presentación: no interviene en la logica de la partida.
+   * contenedor lo usa para fijar la altura del area de juego. Es solo
+   * presentacion: no interviene en la logica de la partida.
    */
   onPartidaActivaChange?: (activa: boolean) => void
   questions: QuestionItem[]
@@ -591,7 +591,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
                         const question = questions.find((item) => item.id === answerItem.questionId)
                         return renderCategoryBadge(question)
                       })()}
-                      <p className="text-base leading-7 text-gray-900" style={{ fontSize: '1.35rem' }}>
+                      <p className="text-base leading-7 text-gray-900" style={{ fontSize: '1.5rem' }}>
                         {answerItem.question}
                       </p>
                     </div>
@@ -647,64 +647,59 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
 
     const esCorrecta = normalizar(tempAnswer) === normalizar(currentQuestion.answer)
 
-    /**
-     * Colores de cada recuadro. Mientras se responde sólo marca el elegido; al
-     * mostrar el resultado tiñe la correcta en verde y, si erró, la elegida en
-     * rojo. Las demás se atenúan, como hacía antes con `opacity-50`.
-     */
-    const colorOpcion = (choice: string) => {
-      const elegida = normalizar(choice) === normalizar(tempAnswer)
-      const correcta = normalizar(choice) === normalizar(currentQuestion.answer)
-
-      if (!showFeedback) {
-        return elegida
-          ? 'border-sky-600 bg-sky-50 text-slate-900 shadow-sm'
-          : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50'
-      }
-
-      if (correcta) return 'border-green-600 bg-green-50 text-green-900'
-      if (elegida) return 'border-red-600 bg-red-50 text-red-900'
-
-      return 'border-slate-300 bg-white text-slate-900 opacity-50'
-    }
-
     return (
       <div className="quiz-viewport">
-        {/* Barra de contexto: categoría · progreso · contador, en una sola fila baja. */}
-        <div className="quiz-topbar">
+        {/*
+          Barra de contexto: categoría · progreso · contador, en una sola fila.
+          Reutiliza la caja gris que antes envolvía sólo al contador, así que los
+          estilos y tamaños son los mismos: lo único que cambia es el orden.
+        */}
+        <div className="quiz-topbar flex items-center justify-between gap-3 rounded-[2rem] bg-slate-100 px-4 py-3">
           {renderCategoryBadge(currentQuestion)}
 
-          <p className="quiz-progreso">
+          <p className="min-w-0 flex-1 text-center text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
             Pregunta {currentIndex + 1} de {questions.length}
           </p>
 
-          <span role="timer" aria-label={`Quedan ${secondsLeft} segundos`} className="quiz-timer">
+          <span
+            role="timer"
+            aria-label={`Quedan ${secondsLeft} segundos`}
+            className="shrink-0 rounded-[1.5rem] bg-white px-3 py-2 text-2xl font-bold text-slate-900 shadow-sm"
+          >
             {secondsLeft}
           </span>
         </div>
 
-        <h2 className="quiz-question">{currentQuestion?.question}</h2>
+        <div className="quiz-question mx-auto w-full max-w-4xl">
+          <h2 className="text-xl font-bold leading-tight text-slate-900 sm:text-3xl text-center">{currentQuestion?.question}</h2>
+        </div>
 
         {/*
           Área principal. Las respuestas conservan su alto por contenido, así que
-          NO se mueven al responder: la tarjeta de resultado aparece en el espacio
-          libre que queda debajo. Si el conjunto no entra, scrollea sólo esta zona
-          —nunca la página— y el botón queda pegado abajo por el `sticky`.
+          no se mueven al responder: la tarjeta de resultado aparece en el espacio
+          libre de abajo. Si el conjunto no entra, scrollea SÓLO esta zona —nunca
+          la página— y el botón queda pegado abajo por el `sticky`.
         */}
         <div className="quiz-main">
-          <div className="choices-grid">
+          <div className="grid gap-3 md:grid-cols-2 choices-grid">
             {currentQuestion.choices?.map((choice) => {
               const isSelected = normalizar(choice) === normalizar(tempAnswer)
+              const esLaCorrecta = normalizar(choice) === normalizar(currentQuestion.answer)
+
+              // Al mostrar el resultado se tiñe la correcta en verde y, si erró,
+              // la elegida en rojo. Antes de responder, los colores de siempre.
+              const colores = !showFeedback
+                ? isSelected
+                  ? 'border-sky-600 bg-sky-50 text-slate-900 shadow-sm'
+                  : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50'
+                : esLaCorrecta
+                  ? 'border-green-600 bg-green-50 text-green-900'
+                  : isSelected
+                    ? 'border-red-600 bg-red-50 text-red-900'
+                    : 'border-slate-300 bg-white text-slate-900 opacity-50'
 
               return (
-                <button
-                  key={choice}
-                  type="button"
-                  onClick={() => handleChoice(choice)}
-                  disabled={showFeedback}
-                  aria-pressed={isSelected}
-                  className={`choice-button ${colorOpcion(choice)} ${showFeedback ? 'cursor-not-allowed' : ''}`}
-                >
+                <button key={choice} type="button" onClick={() => handleChoice(choice)} disabled={showFeedback} aria-pressed={isSelected} style={{ fontSize: '1.5rem' }} className={`rounded-[1.75rem] border px-4 py-3 text-left text-base font-semibold leading-6 transition ${colores} min-h-[3.6rem] ${showFeedback ? 'cursor-not-allowed' : ''}`}>
                   {choice}
                 </button>
               )
@@ -713,7 +708,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
 
           {showFeedback && (
             <div className="quiz-feedback" aria-live="polite">
-              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
                 <div className="space-y-4">
                   <div className="text-center">
                     <p className="text-lg font-semibold text-gray-900">{esCorrecta ? '¡Correcto!' : 'Incorrecto'}</p>

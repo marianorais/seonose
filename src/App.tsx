@@ -64,8 +64,9 @@ const FALLBACK_QUESTIONS: QuestionItem[] = [
 import { getTodayKey, loadCustomSettings, selectDailyQuestions } from './lib/appHelpers'
 
 function App() {
-  // Durante una pregunta el layout pasa a alto fijo y el header se compacta,
-  // para que la pregunta y las opciones entren sin scroll.
+  // Durante una pregunta el layout pasa a alto fijo para que todo entre sin
+  // scroll. El header se compacta (menos padding, controles chicos) pero
+  // conserva el tamano del logo.
   const [partidaActiva, setPartidaActiva] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -320,9 +321,7 @@ function App() {
 
   return (
     <div
-      className={`transition-colors duration-300 ${
-        partidaActiva ? "app-jugando" : "min-h-screen"
-      }`}
+      className={`transition-colors duration-300 ${partidaActiva ? 'app-jugando' : 'min-h-screen'}`}
       style={{
         backgroundColor: gameSettings?.backgroundcolor ?? themeConfig.backgroundColor ?? '#f8fafc',
 
@@ -330,15 +329,14 @@ function App() {
       }}
     >
       <Header
-        compacto={partidaActiva}
         onOpenSidebar={() => setShowSidebar(true)}
         onOpenSettings={() => setShowSettings(true)}
         onOpenStats={() => setShowStats(true)}
       />
 
       <main
-        className={`mx-auto flex w-full max-w-3xl flex-col items-center justify-start lg:px-8 ${
-          partidaActiva ? "main-jugando px-3 py-2" : "px-4 py-5"
+        className={`mx-auto flex w-full max-w-3xl flex-col items-center justify-start px-4 lg:px-8 ${
+          partidaActiva ? 'main-jugando py-2' : 'py-5'
         }`}
       >
         {loading ? (
@@ -346,7 +344,7 @@ function App() {
             Cargando contenido...
           </div>
         ) : (
-          <div className={partidaActiva ? "flex w-full min-h-0 flex-1 flex-col" : "w-full space-y-4"}>
+          <div className={partidaActiva ? 'flex w-full min-h-0 flex-1 flex-col' : 'w-full space-y-4'}>
             <QuizPanel
               onPartidaActivaChange={setPartidaActiva}
               questions={questions}

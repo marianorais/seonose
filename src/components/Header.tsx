@@ -32,7 +32,7 @@ const Header = ({ onOpenSidebar, onOpenSettings, onOpenStats, compacto = false }
   const d = compacto
     ? {
         header: 'px-3 py-2 header-compacto md:px-4',
-        logo: 'h-9',
+        logo: 'h-20',
         control: 'px-2.5 py-1.5 text-sm',
         gap: 'gap-2',
       }

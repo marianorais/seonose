@@ -84,195 +84,162 @@ button {
     @apply rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm;
   }
 
-  /* ======================================================================
-     PANTALLA DE JUEGO
-     ======================================================================
-     Principio: tipografia grande + componentes compactos. Lo que se recorta
-     es el relleno vertical, nunca el tamano del texto.
 
-     Altura: la app entra en modo alto-fijo mientras se juega (`.app-jugando`),
-     asi el area de juego recibe EXACTAMENTE el espacio que sobra despues del
-     header, sin numeros magicos. Se usa `dvh` porque en Safari de iOS `vh`
-     ignora las barras del navegador y deja el contenido fuera de pantalla.
-     ====================================================================== */
 
+
+
+  /* Panel adjustments to fit quiz content within common viewports */
+  /* La pagina no scrollea durante una pregunta: el area de juego recibe
+     exactamente el espacio que sobra despues del header. `dvh` porque en
+     Safari de iOS `vh` ignora las barras del navegador. */
   .app-jugando {
-    height: 100vh;          /* fallback para navegadores sin dvh */
+    height: 100vh;   /* fallback */
     height: 100dvh;
     display: flex;
     flex-direction: column;
-    overflow: hidden;       /* la pagina no scrollea durante la pregunta */
+    overflow: hidden;
   }
 
   .app-jugando > header {
     flex: 0 0 auto;
   }
 
-  .main-jugando {
-    flex: 1 1 auto;
-    min-height: 0;          /* imprescindible: habilita que los hijos se achiquen */
-  }
-
-  /* El notch y la barra de gestos del iPhone. */
+  /* El notch y la barra de estado del iPhone. El logo mantiene su tamano:
+     lo unico que se recorta en modo compacto es el padding. */
   .header-compacto {
     padding-top: max(0.5rem, env(safe-area-inset-top));
   }
 
-  .quiz-viewport {
-    /* Funciona tanto como hijo de columna como de fila. */
+  .main-jugando {
     flex: 1 1 auto;
-    display: flex;
-    flex-direction: column;
-    gap: clamp(0.5rem, 1.5vh, 0.875rem);
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    padding-bottom: env(safe-area-inset-bottom);
+    min-height: 0;   /* habilita que los hijos se achiquen */
   }
 
-  /* --- Barra de contexto: categoria | progreso | contador (~40px) -------- */
-  .quiz-topbar {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    border-radius: 1.25rem;
-    background-color: rgb(241 245 249);
-    padding: 0.3rem 0.6rem;
-  }
-
-  .quiz-progreso {
-    flex: 1 1 auto;
-    min-width: 0;
-    margin: 0;
-    text-align: center;
-    font-size: clamp(0.7rem, 2.8vw, 0.875rem);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: rgb(71 85 105);
-  }
-
-  .quiz-timer {
-    flex: 0 0 auto;
-    border-radius: 0.875rem;
-    background-color: rgb(255 255 255);
-    padding: 0.1rem 0.6rem;
-    font-size: clamp(1.125rem, 4.5vw, 1.5rem);
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    color: rgb(15 23 42);
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  }
-
-  /* --- Pregunta: el texto mas grande, sin relleno de sobra ---------------- */
-  .quiz-question {
-    flex: 0 0 auto;
-    margin: 0;
-    text-align: center;
-    font-weight: 800;
-    line-height: 1.15;
-    color: rgb(15 23 42);
-    font-size: clamp(1.5rem, 6.5vw, 2.25rem);
-    text-wrap: balance;
-  }
-
-  /* --- Area principal: respuestas O resultado, nunca las dos ------------- */
+  /* Area principal: respuestas arriba, resultado en el espacio libre. */
   .quiz-main {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: clamp(0.5rem, 1.5vh, 0.875rem);
-    /* Si respuestas + resultado no entran, scrollea SOLO esta zona: la
-       pregunta y el contador siguen siempre a la vista. */
-    overflow-y: auto;
+    gap: 0.75rem;
+    overflow-y: auto;   /* si no entra, scrollea SOLO esta zona */
+  }
+
+  .quiz-topbar,
+  .quiz-question {
+    flex: 0 0 auto;
+  }
+
+  /* El resultado queda pegado abajo si el area scrollea: el boton no se corta. */
+  .quiz-feedback {
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .quiz-viewport {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    /* Keep header and timer visible; allow choices to scroll internally */
+    align-items: stretch;
   }
 
   .choices-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: clamp(0.375rem, 1.2vh, 0.75rem);
+    gap: 0.5rem;
     /* Alto por CONTENIDO: las respuestas no se mueven cuando aparece la
        tarjeta de resultado debajo. */
     flex: 0 0 auto;
   }
 
-  .choice-button {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    /* Area tactil comoda sin altura desperdiciada: el texto manda. */
-    min-height: 3rem;
-    padding: 0.5rem 0.9rem;
-    border-radius: 1.25rem;
-    border-width: 1px;
-    text-align: left;
-    font-weight: 600;
-    line-height: 1.3;
-    font-size: clamp(1rem, 4vw, 1.25rem);
-    transition: background-color 150ms ease, border-color 150ms ease;
+  /* Desktop spacing for timer vs choices */
+
+
+
+  .choices-grid button {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+    min-height: 3.6rem;
+    font-size: 0.98rem;
   }
 
-  .choice-button:focus-visible {
-    outline: 3px solid rgb(2 132 199);
-    outline-offset: 2px;
+
+
+
+  @media (max-width: 640px) {
+    .quiz-viewport {
+      gap: 0.5rem;
+    }
+
+    .choices-grid button {
+      font-size: 1rem;
+      min-height: 3.8rem;
+      padding-top: 0.7rem;
+      padding-bottom: 0.7rem;
+    }
   }
 
-  /* --- Resultado: aparece DEBAJO, en el espacio libre --------------------- */
-  .quiz-feedback {
-    flex: 0 0 auto;
-    /* Pegado abajo: si el area scrollea, el boton Continuar nunca se corta. */
-    position: sticky;
-    bottom: 0;
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  /* --- Tablet: hay aire, se agranda el area tactil ----------------------- */
-  @media (min-width: 768px) {
+  /* Netbook / small laptop adjustments */
+  @media (min-width: 900px) and (max-width: 1280px) {
+    html {
+      font-size: 13px; /* netbooks: slightly smaller base for denser layouts */
+    }
+
+    .quiz-viewport {
+      gap: 0.6rem;
+      padding-bottom: 0.25rem;
+    }
+
+    .quiz-viewport h2 {
+      font-size: 1.1rem;
+      margin-top: 0.25rem;
+    }
+
+
+
+    .choices-grid button {
+      font-size: 0.9rem;
+      min-height: 3rem;
+      padding-top: 0.45rem;
+      padding-bottom: 0.45rem;
+      border-radius: 1rem;
+    }
+
     .choices-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .choice-button {
-      min-height: 3.75rem;
-      padding: 0.75rem 1.1rem;
+      gap: 0.45rem;
     }
   }
 
-  /* --- Desktop: tarjeta centrada, sin respuestas gigantes ---------------- */
-  @media (min-width: 1024px) {
+  /* Specific tweaks for very small phones (iPhone SE and similar) */
+  @media (max-width: 375px) {
     .quiz-viewport {
-      max-width: 48rem;
-      margin-inline: auto;
+      gap: 0.4rem;
+      padding-bottom: 0.25rem;
     }
 
-    .choice-button {
-      min-height: 4rem;
-    }
-  }
+    /* .quiz-viewport h2 {
+      font-size: 1.05rem;
+      margin-top: 0.25rem;
+    } */
 
-  /* --- Pantallas muy bajas: se recorta el aire, no la tipografia --------- */
-  @media (max-height: 640px) {
-    .quiz-viewport {
-      gap: 0.375rem;
-    }
 
-    .quiz-question {
-      font-size: clamp(1.25rem, 5.5vw, 1.75rem);
+    .choices-grid {
+      gap: 0.4rem;
     }
 
-    .choice-button {
-      min-height: 2.75rem;
-      padding-top: 0.375rem;
-      padding-bottom: 0.375rem;
+    .choices-grid button {
+      font-size: 0.95rem;
+      min-height: 3.2rem;
+      padding-top: 0.45rem;
+      padding-bottom: 0.45rem;
+      border-radius: 1.25rem;
     }
-  }
 
-  @media (prefers-reduced-motion: reduce) {
-    .choice-button,
-    .quiz-continue {
-      transition: none;
-    }
   }
 }
+
+

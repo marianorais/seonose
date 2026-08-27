@@ -682,7 +682,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
         </div>
 
         <div className="quiz-question mx-auto w-full max-w-4xl">
-          <h2 className="text-2xl font-bold leading-tight text-slate-900 sm:text-3xl text-center">{currentQuestion?.question}</h2>
+          <h2 className="font-bold leading-tight text-slate-900 text-center">{currentQuestion?.question}</h2>
         </div>
 
         {/*
@@ -710,7 +710,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
                     : 'border-slate-300 bg-white text-slate-900 opacity-50'
 
               return (
-                <button key={choice} type="button" onClick={() => handleChoice(choice)} disabled={showFeedback} aria-pressed={isSelected} style={{ fontSize: '1.5rem' }} className={`flex items-center gap-3 rounded-[1.75rem] border px-4 py-3 text-left text-base font-semibold leading-6 transition ${colores} min-h-[3.6rem] ${showFeedback ? 'cursor-not-allowed' : ''}`}>
+                <button key={choice} type="button" onClick={() => handleChoice(choice)} disabled={showFeedback} aria-pressed={isSelected} style={{ fontSize: 'var(--quiz-texto)' }} className={`flex items-center gap-3 rounded-[1.75rem] border px-4 py-3 text-left font-semibold transition ${colores} min-h-[3.6rem] ${showFeedback ? 'cursor-not-allowed' : ''}`}>
                   <span className="min-w-0 flex-1">{choice}</span>
 
                   {showFeedback && esLaCorrecta && respondio && (

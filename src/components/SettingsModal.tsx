@@ -31,7 +31,7 @@ const SettingsModal = ({ isOpen, onClose, settings }: SettingsModalProps) => {
         <div className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-3xl max-h-[90vh] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_35px_90px_rgba(15,23,42,0.15)]" style={{ height: '-webkit-fill-available' }}>
           <div className="relative border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5 text-center">
             <h2 className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Ajustes</h2>
-            <p className="mt-2 text-sm text-slate-500">Juego diario: {settings?.questionsPerDay ?? 5} preguntas · {settings?.secondsPerQuestion ?? 30}s por pregunta</p>
+            <p className="mt-2 text-sm text-slate-500">Juego diario: {settings?.questionsPerDay ?? 8} preguntas · {settings?.secondsPerQuestion ?? 30}s por pregunta</p>
             <button
               type="button"
               onClick={onClose}

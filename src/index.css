@@ -84,95 +84,120 @@ button {
     @apply rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm;
   }
 
-  .quiz-panel {
-    min-height: auto;
-    overflow: visible;
+/* Panel adjustments to fit quiz content within common viewports */
+  /* La pagina no scrollea durante una pregunta: el area de juego recibe
+     exactamente el espacio que sobra despues del header. `dvh` porque en
+     Safari de iOS `vh` ignora las barras del navegador. */
+  /* ----------------------------------------------------------------------
+     La pantalla de juego NO define tipografia propia: hereda la de la app.
+
+     La familia la fija `App` en el contenedor raiz a partir de
+     `game_settings.fontfamily` (o del tema local), asi que cambiarla en
+     /configuraciones se refleja tambien acá.
+
+     Esta regla lo vuelve explicito en lugar de depender solo del
+     `button { font: inherit }` global: si alguien manana agrega una
+     font-family en cualquier parte del quiz, o toca esa regla global, los
+     recuadros seguirian usando la fuente de la app y no la del navegador.
+     ---------------------------------------------------------------------- */
+  .quiz-viewport,
+  .quiz-viewport * {
+    font-family: inherit;
   }
 
-  .quiz-panel h2 {
-    line-height: 1.1;
-  }
-
-  .quiz-panel button {
-    min-height: 4.25rem;
-  }
-
-  @media (max-height: 720px) {
-    .quiz-panel {
-      min-height: calc(100vh - 10rem);
-    }
-
-    .quiz-panel h2 {
-      font-size: 1.55rem;
-    }
-
-    .quiz-panel button {
-      min-height: 3.5rem;
-      padding-top: 0.75rem;
-      padding-bottom: 0.75rem;
-    }
-  }
-
-  /* Panel adjustments to fit quiz content within common viewports */
-  .quiz-viewport {
-    min-height: calc(100vh - 72px);
+  .app-jugando {
+    height: 100vh;   /* fallback */
+    height: 100dvh;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    overflow: hidden;
+  }
+
+  .app-jugando > header {
+    flex: 0 0 auto;
+  }
+
+  /* El notch y la barra de estado del iPhone. El logo mantiene su tamano:
+     lo unico que se recorta en modo compacto es el padding. */
+  .header-compacto {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+
+  .main-jugando {
+    flex: 1 1 auto;
+    min-height: 0;   /* habilita que los hijos se achiquen */
+  }
+
+  /* Area principal: respuestas arriba, resultado en el espacio libre. */
+  .quiz-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    overflow-y: auto;   /* si no entra, scrollea SOLO esta zona */
+  }
+
+  /* El lema: presente pero sin competir con la pregunta, que es la que manda. */
+  .quiz-lema {
+    flex: 0 0 auto;
+    margin: 0;
+    text-align: center;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: rgb(100 116 139);
+    text-wrap: balance;
+  }
+
+  .quiz-topbar,
+  .quiz-question {
+    flex: 0 0 auto;
+  }
+
+  /* El hueco mas grande de la pantalla: separa lo que se pregunta de lo que
+     se responde. */
+  .quiz-question {
+    margin-top: 0.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* El resultado queda pegado abajo si el area scrollea: el boton no se corta. */
+  .quiz-feedback {
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .quiz-viewport {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
     padding-bottom: 0.5rem;
     /* Keep header and timer visible; allow choices to scroll internally */
     align-items: stretch;
   }
 
   .choices-grid {
-    gap: 0.5rem;
-    /* Allow choices to take remaining space and scroll if needed */
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: auto;
+    gap: 0.875rem;
+    /* Alto por CONTENIDO: las respuestas no se mueven cuando aparece la
+       tarjeta de resultado debajo. */
+    flex: 0 0 auto;
   }
 
   /* Desktop spacing for timer vs choices */
-  .timer-box {
-    margin-bottom: 1rem;
-  }
 
-  @media (min-width: 768px) {
-    .timer-box {
-      margin-bottom: 1.25rem;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .timer-box {
-      margin-bottom: 1.5rem;
-    }
-  }
-
-  .choices-grid button {
+.choices-grid button {
     padding-top: 0.6rem;
     padding-bottom: 0.6rem;
     min-height: 3.6rem;
     font-size: 0.98rem;
   }
 
-  .result-card {
-    padding: 0.6rem;
-  }
-
-  .result-card p {
-    font-size: 0.95rem;
-  }
-
-  .action-grid {
-    margin-top: 0.25rem;
-  }
-
-  @media (max-width: 640px) {
-    .quiz-viewport {
-      min-height: calc(100vh - 64px);
-      gap: 0.5rem;
-    }
+@media (max-width: 640px) {
 
     .choices-grid button {
       font-size: 1rem;
@@ -188,78 +213,64 @@ button {
       font-size: 13px; /* netbooks: slightly smaller base for denser layouts */
     }
 
-    .quiz-viewport {
-      gap: 0.6rem;
-      padding-bottom: 0.25rem;
-    }
-
-    .quiz-viewport h2 {
+.quiz-viewport h2 {
       font-size: 1.1rem;
       margin-top: 0.25rem;
     }
 
-    .timer-box {
-      padding-top: 0.4rem;
-      padding-bottom: 0.4rem;
-      padding-left: 0.6rem;
-      padding-right: 0.6rem;
-    }
-
-    .timer-box span {
-      font-size: 1.5rem;
-      padding: 0.3rem 0.6rem;
-    }
-
-    .choices-grid button {
+.choices-grid button {
       font-size: 0.9rem;
       min-height: 3rem;
       padding-top: 0.45rem;
       padding-bottom: 0.45rem;
       border-radius: 1rem;
     }
-
-    .choices-grid {
-      gap: 0.45rem;
-    }
   }
 
   /* Specific tweaks for very small phones (iPhone SE and similar) */
   @media (max-width: 375px) {
-    .quiz-viewport {
-      min-height: calc(100vh - 56px);
-      gap: 0.4rem;
-      padding-bottom: 0.25rem;
-    }
 
     /* .quiz-viewport h2 {
       font-size: 1.05rem;
       margin-top: 0.25rem;
     } */
 
-    .timer-box {
-      padding-left: 0.75rem;
-      padding-right: 0.75rem;
-      padding-top: 0.45rem;
-      padding-bottom: 0.45rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .choices-grid {
-      gap: 0.4rem;
-    }
-
-    .choices-grid button {
+.choices-grid button {
       font-size: 0.95rem;
       min-height: 3.2rem;
       padding-top: 0.45rem;
       padding-bottom: 0.45rem;
       border-radius: 1.25rem;
     }
+  }
+  /* Pantallas realmente bajas (iPhone SE, celular apaisado): aca si conviene
+     recortar el aire. Se toca el espacio, nunca la tipografia. */
+  @media (max-height: 700px) {
 
-    .quiz-panel button {
-      min-height: 3rem;
+    .quiz-viewport {
+      gap: 0.75rem;
+    }
+
+    .quiz-question {
+      margin-top: 0;
+      margin-bottom: 0.375rem;
+    }
+
+    .choices-grid {
+      gap: 0.5rem;
+    }
+
+    .quiz-main {
+      gap: 0.75rem;
+    }
+  }
+  /* Solo en pantallas donde el espacio NO alcanza (iPhone SE, 13 mini,
+     apaisado) el lema cede su lugar. Arriba de eso se muestra: en un iPhone 14
+     sobran ~65px incluso con el lema puesto. */
+  @media (max-height: 620px) {
+    .quiz-lema {
+      display: none;
     }
   }
 }
-
 

@@ -646,9 +646,20 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
     }
 
     const esCorrecta = normalizar(tempAnswer) === normalizar(currentQuestion.answer)
+    /** `false` cuando se acabo el tiempo sin tocar ninguna opcion. */
+    const respondio = tempAnswer.trim() !== ''
 
     return (
       <div className="quiz-viewport">
+        {/*
+          El lema, arriba de todo. Solo en la pregunta 1 y antes de responder:
+          es lo primero que ve quien entra a la app, y despues libera el espacio
+          en lugar de repetirse en las 8 preguntas.
+        */}
+        {currentIndex === 0 && !showFeedback && (
+          <p className="quiz-lema">Ocho preguntas, ocho temas, ¿cuánto sabés de verdad?</p>
+        )}
+
         {/*
           Barra de contexto: categoría · progreso · contador, en una sola fila.
           Reutiliza la caja gris que antes envolvía sólo al contador, así que los
@@ -671,14 +682,14 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
         </div>
 
         <div className="quiz-question mx-auto w-full max-w-4xl">
-          <h2 className="text-xl font-bold leading-tight text-slate-900 sm:text-3xl text-center">{currentQuestion?.question}</h2>
+          <h2 className="text-2xl font-bold leading-tight text-slate-900 sm:text-3xl text-center">{currentQuestion?.question}</h2>
         </div>
 
         {/*
           Área principal. Las respuestas conservan su alto por contenido, así que
-          no se mueven al responder: la tarjeta de resultado aparece en el espacio
-          libre de abajo. Si el conjunto no entra, scrollea SÓLO esta zona —nunca
-          la página— y el botón queda pegado abajo por el `sticky`.
+          no se mueven al responder: sólo cambian de color y aparece el botón en
+          el espacio libre de abajo. Si el conjunto no entra, scrollea SÓLO esta
+          zona —nunca la página— y el botón queda pegado abajo por el `sticky`.
         */}
         <div className="quiz-main">
           <div className="grid gap-3 md:grid-cols-2 choices-grid">
@@ -699,28 +710,51 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
                     : 'border-slate-300 bg-white text-slate-900 opacity-50'
 
               return (
-                <button key={choice} type="button" onClick={() => handleChoice(choice)} disabled={showFeedback} aria-pressed={isSelected} style={{ fontSize: '1.5rem' }} className={`rounded-[1.75rem] border px-4 py-3 text-left text-base font-semibold leading-6 transition ${colores} min-h-[3.6rem] ${showFeedback ? 'cursor-not-allowed' : ''}`}>
-                  {choice}
+                <button key={choice} type="button" onClick={() => handleChoice(choice)} disabled={showFeedback} aria-pressed={isSelected} style={{ fontSize: '1.5rem' }} className={`flex items-center gap-3 rounded-[1.75rem] border px-4 py-3 text-left text-base font-semibold leading-6 transition ${colores} min-h-[3.6rem] ${showFeedback ? 'cursor-not-allowed' : ''}`}>
+                  <span className="min-w-0 flex-1">{choice}</span>
+
+                  {showFeedback && esLaCorrecta && respondio && (
+                    <span aria-hidden="true" className="shrink-0 font-bold">✓</span>
+                  )}
+                  {showFeedback && esLaCorrecta && !respondio && (
+                    <span className="shrink-0 rounded-full bg-green-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+                      Era esta
+                    </span>
+                  )}
+                  {showFeedback && isSelected && !esLaCorrecta && (
+                    <span aria-hidden="true" className="shrink-0 font-bold">✗</span>
+                  )}
                 </button>
               )
             })}
           </div>
 
           {showFeedback && (
-            <div className="quiz-feedback" aria-live="polite">
-              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="space-y-4">
-                  <div className="text-center">
-                    <p className="text-lg font-semibold text-gray-900">{esCorrecta ? '¡Correcto!' : 'Incorrecto'}</p>
-                    <p className="mt-2 text-lg text-gray-600">Tu respuesta:{' '}<span className={esCorrecta ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>{tempAnswer || 'Sin respuesta'}</span></p>
-                    {!esCorrecta && (<p className="mt-2 text-lg text-gray-600">Respuesta correcta:{' '}<span className="text-green-600 font-semibold">{currentQuestion.answer}</span></p>)}
-                  </div>
+            <div className="quiz-feedback">
+              {/*
+                El resultado ya se lee en los propios recuadros —verde la
+                correcta, rojo la elegida si erro— asi que abajo solo queda el
+                boton. Se ahorra toda la altura que ocupaba la tarjeta blanca.
 
-                  <button type="button" onClick={handleNext} className="w-full rounded-[1.75rem] bg-slate-900 px-5 py-4 text-base font-semibold text-white transition hover:bg-slate-700">{currentIndex + 1 >= questions.length ? 'Ver resultados' : 'Siguiente pregunta'}</button>
-                </div>
-              </div>
-            </div>
-          )}
+                El texto sigue existiendo para lectores de pantalla: sin el, el
+                unico indicio del resultado seria el color.
+              */}
+              <span className="sr-only" role="status" aria-live="polite">
+                {esCorrecta
+                  ? '¡Correcto!'
+                  : tempAnswer
+                    ? `Incorrecto. La respuesta correcta era ${currentQuestion.answer}.`
+                    : `Se acabó el tiempo. La respuesta correcta era ${currentQuestion.answer}.`}
+              </span>
+
+              {!respondio && (
+                <p className="rounded-[1.25rem] bg-red-50 px-4 py-2 text-center text-base font-semibold text-red-800">
+                  <span aria-hidden="true">⏱</span> Se acabó el tiempo, no respondiste
+                </p>
+              )}
+
+              <button type="button" onClick={handleNext} className="w-full rounded-[1.75rem] bg-slate-900 px-5 py-4 text-base font-semibold text-white transition hover:bg-slate-700">{currentIndex + 1 >= questions.length ? 'Ver resultados' : 'Siguiente pregunta'}</button>
+            </div>          )}
         </div>
       </div>
     )

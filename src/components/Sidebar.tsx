@@ -79,6 +79,20 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                   <p className="text-xs text-gray-500">Mirá en qué puesto estás y quién te está ganando.</p>
                 </>
               )}
+
+              <EnlaceNav
+                to="/salas"
+                onClose={onClose}
+                activo={pathname === '/salas' || pathname.startsWith('/sala/')}
+              >
+                👥 Salas
+              </EnlaceNav>
+              <p className="text-xs text-gray-500">Creá una sala, invitá a tus amigos y descubrí quién sabe más.</p>
+
+              <EnlaceNav to="/anteriores" onClose={onClose} activo={pathname.startsWith('/anteriores')}>
+                📅 Desafíos anteriores
+              </EnlaceNav>
+              <p className="text-xs text-gray-500">¿Te perdiste algún día? Todavía podés jugarlo.</p>
             </div>
           </div>
 

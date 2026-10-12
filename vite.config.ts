@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -8,5 +9,12 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:5000',
     },
+  },
+  test: {
+    include: ['src/**/*.test.{ts,tsx}', 'supabase/tests/**/*.test.ts'],
+    environment: 'node',
+    // PGlite arranca un Postgres por archivo: le damos margen.
+    testTimeout: 30000,
+    hookTimeout: 60000,
   },
 })

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { QuestionItem, QuestionSettings } from '../types'
 import ShareModal from './ShareModal'
+import AccesosPostPartida from './AccesosPostPartida'
 import { supabase } from '../lib/supabase'
+import { formatearFechaLarga } from '../lib/fechas'
 
 import { getClientInfo } from '../lib/userSession'
 import {
@@ -57,6 +59,15 @@ interface QuizPanelProps {
   settings: QuestionSettings | null
   questionDate: string
   allowReplay: boolean
+  /**
+   * Desafío de un día anterior: se guarda marcado como tal, con su fecha. Todo
+   * lo demás (temporizador, corrección, resultados) es igual al del día.
+   */
+  esAnterior?: boolean
+  /** Número del desafío (por defecto, el de hoy). */
+  numeroDesafio?: number
+  /** Dónde se guarda el progreso (por defecto, el del desafío de hoy). */
+  claveEstado?: string
 }
 
 /**
@@ -64,10 +75,22 @@ interface QuizPanelProps {
  * y guarda resultados en `localStorage` y Supabase. Mantiene la lógica
  * original, solo se ha modularizado el código.
  */
-const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaActivaChange }: QuizPanelProps) => {
-    const savedState = typeof window !== 'undefined' ? cargarEstadoGuardado<SavedQuizState>(questionDate) : null
+const QuizPanel = ({
+  questions,
+  settings,
+  questionDate,
+  allowReplay,
+  onPartidaActivaChange,
+  esAnterior = false,
+  numeroDesafio,
+  claveEstado,
+}: QuizPanelProps) => {
+    const savedState =
+      typeof window !== 'undefined' ? cargarEstadoGuardado<SavedQuizState>(questionDate, claveEstado) : null
 
-    const gameNumber = useMemo(() => obtenerNumeroPartida(), [])
+    const gameNumber = useMemo(() => numeroDesafio ?? obtenerNumeroPartida(), [numeroDesafio])
+    // Un desafío anterior que este dispositivo ya había jugado: la base no lo guarda dos veces.
+    const [yaJugado, setYaJugado] = useState<boolean>(false)
 
     const [currentIndex, setCurrentIndex] = useState<number>(savedState?.currentIndex ?? 0)
     const [secondsLeft, setSecondsLeft] = useState<number>(savedState?.secondsLeft ?? settings?.secondsPerQuestion ?? 30)
@@ -133,6 +156,8 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
           correctanswers: correctCount,
           userip: clientInfo.ip,
           useragent: clientInfo.userAgent,
+          // Desafío anterior: la base controla que sea una sola vez por dispositivo.
+          ...(esAnterior ? { fecha_desafio: questionDate, es_anterior: true } : {}),
         }
 
         const insertarSesion = (payload: Record<string, unknown>) =>
@@ -165,6 +190,12 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
         }
 
         if (sessionError || !gameSession) {
+          // Desafío anterior ya jugado en este dispositivo: no es un error, se avisa.
+          if (esAnterior && /desafio-ya-jugado|duplicate key/i.test(sessionError?.message ?? '')) {
+            setYaJugado(true)
+            return
+          }
+
           console.error('Error creando sesión', sessionError)
           return
         }
@@ -241,7 +272,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
     }
 
     const resetQuiz = useCallback(() => {
-      limpiarEstadoQuiz()
+      limpiarEstadoQuiz(claveEstado)
       setAnswers([])
       setCurrentIndex(0)
       setFinished(false)
@@ -257,6 +288,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
       advancingRef.current = false
     }, [
       settings,
+      claveEstado,
       setAnswers,
       setCurrentIndex,
       setFinished,
@@ -349,8 +381,8 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
       }
 
       latestSnapshotRef.current = snapshot
-      guardarEstadoQuiz(snapshot)
-    }, [currentIndex, secondsLeft, answers, finished, nextIteration, gameNumber, questionDate, showFeedback, tempAnswer, isTimeout])
+      guardarEstadoQuiz(snapshot, claveEstado)
+    }, [currentIndex, secondsLeft, answers, finished, nextIteration, gameNumber, questionDate, showFeedback, tempAnswer, isTimeout, claveEstado])
 
     // Persiste el último estado con progreso justo antes de que la página se
     // oculte o se descargue (refresh, cierre, cambio de pestaña), cerrando la
@@ -358,7 +390,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
     useEffect(() => {
       const flush = () => {
         if (latestSnapshotRef.current) {
-          guardarEstadoQuiz(latestSnapshotRef.current)
+          guardarEstadoQuiz(latestSnapshotRef.current, claveEstado)
         }
       }
 
@@ -373,7 +405,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
         window.removeEventListener('pagehide', flush)
         document.removeEventListener('visibilitychange', onVisibilityChange)
       }
-    }, [])
+    }, [claveEstado])
 
     const handleNext = async () => {
       if (!currentQuestion || !showFeedback) return
@@ -439,6 +471,7 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
       return [
         `🧠 Se o NoSe #${gameNumber} ${correctCount}/${total}`,
         barra,
+        ...(esAnterior ? [`📅 Desafío del ${formatearFechaLarga(questionDate)}`] : []),
         `👉 ${window.location.origin}`,
       ].join('\n')
     }
@@ -496,7 +529,9 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
             <div className="flex flex-col gap-4 rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:flex-row sm:items-end sm:justify-between">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">Resultados</p>
+                  <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">
+                    {esAnterior ? `Desafío #${gameNumber} · ${formatearFechaLarga(questionDate)}` : "Resultados"}
+                  </p>
                   <h2 className="mt-3 text-3xl font-bold text-gray-900">{correctCount} de {answers.length} correctas</h2>
                   <p className="mt-2 text-lg tracking-wide" aria-label={`${correctCount} de ${answers.length} correctas`}>
                     {answers.map((a, index) => (
@@ -536,10 +571,12 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
                 </div>
               </div>
 
-                <div className="flex min-w-[180px] flex-col justify-center rounded-3xl bg-gray-900 px-5 py-4 text-right text-white sm:text-left">
-                  <p className="text-xs uppercase tracking-widest text-slate-300">🔥 Nuevo desafío en</p>
-                  <p className="mt-2 text-4xl font-bold">{remainingText}</p>
-                </div>
+                {!esAnterior && (
+                  <div className="flex min-w-[180px] flex-col justify-center rounded-3xl bg-gray-900 px-5 py-4 text-right text-white sm:text-left">
+                    <p className="text-xs uppercase tracking-widest text-slate-300">🔥 Nuevo desafío en</p>
+                    <p className="mt-2 text-4xl font-bold">{remainingText}</p>
+                  </div>
+                )}
             </div>
 
             {/*
@@ -547,6 +584,12 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
               que el jugador quiere saber cómo le fue contra los demás.
               Oculto hasta que el ranking esté productivo (ver `featureFlags`).
             */}
+            {yaJugado && (
+              <p role="status" className="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-700">
+                Este desafío ya lo habías jugado en este dispositivo, así que este resultado no se guardó. Vale el primero.
+              </p>
+            )}
+
             {MOSTRAR_ACCESO_RANKING && (
               <Link
                 to="/ranking"
@@ -577,6 +620,8 @@ const QuizPanel = ({ questions, settings, questionDate, allowReplay, onPartidaAc
                 </span>
               </Link>
             )}
+
+            <AccesosPostPartida esHistorico={esAnterior} />
 
               {/* Prominent share actions: WhatsApp, copy, native share */}
               <div className="space-y-4">

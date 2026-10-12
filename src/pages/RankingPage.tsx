@@ -13,14 +13,14 @@ import StatsModal from '../components/StatsModal'
 import RankingBoard from '../components/RankingBoard'
 
 import { loadThemeConfig } from '../lib/themeConfig'
-import { loadCustomSettings } from '../lib/appHelpers'
+import { useConfiguracionJuego } from '../lib/configuracionJuego'
 
 function RankingPage() {
   const [showSidebar, setShowSidebar] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [themeConfig] = useState(() => loadThemeConfig())
-  const [settings] = useState(() => loadCustomSettings())
+  const settings = useConfiguracionJuego()
 
   return (
     <div

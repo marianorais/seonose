@@ -3,7 +3,10 @@
  * No cambian la lógica de negocio; solo agrupan funciones para mejorar modularidad.
  */
 
-export const GAME_START_DATE = '2026-07-07'
+import { getTodayKey } from './appHelpers'
+import { INICIO_JUEGO, numeroDeDesafio } from './fechas'
+
+export const GAME_START_DATE = INICIO_JUEGO
 
 export const CLAVE_ESTADO_QUIZ = 'seonose-quiz-state'
 export const CLAVE_HISTORIAL_RESULTADOS = 'seonose-results-history'
@@ -15,23 +18,12 @@ export const normalizar = (value?: string) =>
     .toLowerCase()
     .trim()
 
-export const obtenerNumeroPartida = () => {
-  // Parseamos GAME_START_DATE como fecha local (no UTC) para evitar
-  // corrimientos de un día en zonas horarias negativas (ej. Argentina).
-  const [year, month, day] = GAME_START_DATE.split('-').map(Number)
-  const start = new Date(year, month - 1, day)
-
-  const today = new Date()
-
-  start.setHours(0, 0, 0, 0)
-  today.setHours(0, 0, 0, 0)
-
-  const diffMs = today.getTime() - start.getTime()
-
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-  return diffDays + 1
-}
+/**
+ * Número del desafío de hoy. Usa la fecha de Argentina, igual que el servidor:
+ * antes dependía de la hora local del dispositivo y alguien fuera del país
+ * podía compartir un número distinto del que estaba jugando.
+ */
+export const obtenerNumeroPartida = () => numeroDeDesafio(getTodayKey())
 
 export const obtenerSiguienteIteracion = () => {
   const now = new Date()
@@ -56,9 +48,14 @@ export const formatearTiempoRestante = (target: Date) => {
     .padStart(2, '0')}`
 }
 
-export const cargarEstadoGuardado = <T = any>(expectedDayKey?: string) => {
+/**
+ * Estado de la partida en curso. `clave` permite tener más de una partida
+ * guardada a la vez (la de hoy y la de un día anterior) sin que se pisen; por
+ * defecto es la de siempre, así el desafío diario lee lo que ya había.
+ */
+export const cargarEstadoGuardado = <T = unknown>(expectedDayKey?: string, clave: string = CLAVE_ESTADO_QUIZ) => {
   try {
-    const raw = window.localStorage.getItem(CLAVE_ESTADO_QUIZ)
+    const raw = window.localStorage.getItem(clave)
 
     if (!raw) return null
 
@@ -80,17 +77,17 @@ export const cargarEstadoGuardado = <T = any>(expectedDayKey?: string) => {
   }
 }
 
-export const guardarEstadoQuiz = (state: any) => {
+export const guardarEstadoQuiz = (state: unknown, clave: string = CLAVE_ESTADO_QUIZ) => {
   try {
-    window.localStorage.setItem(CLAVE_ESTADO_QUIZ, JSON.stringify(state))
+    window.localStorage.setItem(clave, JSON.stringify(state))
   } catch {
     // Ignore storage errors
   }
 }
 
-export const limpiarEstadoQuiz = () => {
+export const limpiarEstadoQuiz = (clave: string = CLAVE_ESTADO_QUIZ) => {
   try {
-    window.localStorage.removeItem(CLAVE_ESTADO_QUIZ)
+    window.localStorage.removeItem(clave)
   } catch {
     // Ignore storage errors
   }
@@ -119,7 +116,7 @@ export const tieneHistorialLocal = () => {
   }
 }
 
-export const guardarResultadoEnHistorial = (answers: any[]) => {
+export const guardarResultadoEnHistorial = (answers: { isCorrect: boolean }[]) => {
   try {
     const correctCount = answers.filter((a) => a.isCorrect).length
 

@@ -413,14 +413,23 @@ const COLUMNAS_SESION_LEGADO = 'id,correctanswers,totalquestions,userip'
  * correr), reintenta con las columnas de siempre y agrupa por IP como antes: el
  * ranking sigue andando en lugar de romperse entero.
  */
-const obtenerSesionesDelRango = async (fromIso: string, toIso: string): Promise<SessionRow[]> => {
-  const consultar = (columnas: string) =>
-    supabase
+const obtenerSesionesDelRango = async (
+  fromIso: string,
+  toIso: string,
+  incluirAnteriores: boolean
+): Promise<SessionRow[]> => {
+  const consultar = (columnas: string) => {
+    const consulta = supabase
       .from('game_sessions')
       .select(columnas)
       .gte('completedat', fromIso)
       .lt('completedat', toIso)
-      .limit(MAX_SESSIONS)
+
+    // Los desafíos de días anteriores suman al ranking del mes y del año (en
+    // el período en que se jugaron), pero no al de "Hoy": ése es sólo del
+    // desafío del día.
+    return (incluirAnteriores ? consulta : consulta.eq('es_anterior', false)).limit(MAX_SESSIONS)
+  }
 
   const { data, error } = await consultar(COLUMNAS_SESION)
 
@@ -646,7 +655,7 @@ export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData
   }
 
   const [rows, mapa] = await Promise.all([
-    obtenerSesionesDelRango(fromIso, toIso),
+    obtenerSesionesDelRango(fromIso, toIso, period !== 'diario'),
     obtenerMapaIdentidades(MAX_ALIASES),
   ])
 

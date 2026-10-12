@@ -30,6 +30,23 @@ npm run build
 
 El resultado se genera en la carpeta `dist`.
 
+## 🧪 Pruebas
+
+```bash
+npm test          # todo
+npm run test:app  # frontend (lógica y pantallas, con Supabase simulado)
+npm run test:db   # migraciones, permisos y funciones SQL sobre un Postgres en memoria
+```
+
+Ninguna prueba se conecta a Supabase real.
+
+## 🗄️ Base de datos
+
+El esquema, las migraciones y el orden de despliegue están en
+[`supabase/README.md`](supabase/README.md). Las reglas del juego que importan
+(qué preguntas tiene cada fecha, qué partida es válida y cuántos aciertos tuvo)
+las decide el servidor mediante funciones RPC.
+
 ## 🌐 Variables de entorno
 
 La aplicación usa `VITE_API_BASE_URL` para apuntar al backend si está disponible.

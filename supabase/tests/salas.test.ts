@@ -140,7 +140,8 @@ describe('ranking de la sala', () => {
     await jugar(db, BETO, '2026-10-10T10:00:00-03:00', 5)
     await jugar(db, CAMI, '2026-10-10T10:00:00-03:00', 8)
 
-    // 11/10 (hoy): sólo Cami (un solo jugador no da victoria) y un desafío anterior que no suma.
+    // 11/10 (hoy): sólo Cami (un solo jugador no da victoria). Además recupera
+    // el 09/10 como desafío anterior: es posterior a la creación, así que suma.
     await fijarAhora(db, '2026-10-11T12:00:00-03:00')
     await jugar(db, CAMI, '2026-10-11T10:00:00-03:00', 8)
     await jugar(db, CAMI, '2026-10-11T11:00:00-03:00', 8, '2026-10-09')
@@ -148,13 +149,15 @@ describe('ranking de la sala', () => {
 
   const ranking = (playerid = ANA) => rpc<Ranking>(db, 'ranking_sala', { p_codigo: codigo, p_playerid: playerid })
 
-  it('suma la primera partida de cada día desde que existe la sala', async () => {
+  it('suma una partida por persona y día desde que existe la sala, incluidos los desafíos anteriores', async () => {
     const { tabla } = await ranking()
     const por = Object.fromEntries(tabla.map((f) => [f.alias, f]))
 
-    expect(por.Ana).toMatchObject({ puntos: 13, partidas: 2, victorias: 1, porcentaje: 81.3 })
-    expect(por.Beto).toMatchObject({ puntos: 11, partidas: 2, victorias: 1 })
-    expect(por.Cami).toMatchObject({ puntos: 16, partidas: 2, victorias: 1, jugo_hoy: true })
+    // La repetición de Beto del 09/10 no suma; el 08/10 de Cami (antes de la sala) tampoco.
+    expect(por.Ana).toMatchObject({ puntos: 13, partidas: 2, victorias: 0, porcentaje: 81.3 })
+    expect(por.Beto).toMatchObject({ puntos: 11, partidas: 2, victorias: 0 })
+    // Cami: 09/10 (recuperado) + 10/10 + 11/10. Gana el 09/10 y el 10/10.
+    expect(por.Cami).toMatchObject({ puntos: 24, partidas: 3, victorias: 2, jugo_hoy: true })
   })
 
   it('ordena por puntos y marca al jugador actual', async () => {
@@ -184,6 +187,55 @@ describe('ranking de la sala', () => {
       p_playerid: BETO,
     })
     expect(salas.salas).toEqual([expect.objectContaining({ codigo, mi_posicion: 3, integrantes: 3 })])
+  })
+})
+
+describe('fecha de creación de la sala', () => {
+  // La sala se crea el 10/10. Beto se une el 12/10 y recupera días anteriores.
+  let db: PGlite
+  let codigo: string
+
+  beforeAll(async () => {
+    db = await base()
+    await fijarAhora(db, '2026-10-10T09:00:00-03:00')
+    codigo = (await crear(db, ANA, 'Desde el 10')).codigo!
+
+    await fijarAhora(db, '2026-10-11T09:00:00-03:00')
+    await rpc(db, 'unirse_sala', { p_codigo: codigo, p_playerid: CAMI })
+    await jugar(db, CAMI, '2026-10-11T10:00:00-03:00', 3)
+
+    await fijarAhora(db, '2026-10-12T12:00:00-03:00')
+    await rpc(db, 'unirse_sala', { p_codigo: codigo, p_playerid: BETO })
+    await jugar(db, BETO, '2026-10-12T10:00:00-03:00', 5, '2026-10-09')
+    await jugar(db, BETO, '2026-10-12T10:10:00-03:00', 6, '2026-10-10')
+    await jugar(db, BETO, '2026-10-12T10:20:00-03:00', 7, '2026-10-11')
+  })
+
+  const fila = async (alias: string) =>
+    (await rpc<Ranking>(db, 'ranking_sala', { p_codigo: codigo, p_playerid: ANA })).tabla.find((f) => f.alias === alias)
+
+  it('quien se une tarde suma los días desde la creación (inclusive), no los anteriores', async () => {
+    // 09/10 no (antes de la sala); 10/10 y 11/10 sí, aunque se unió el 12/10.
+    expect(await fila('Beto')).toMatchObject({ puntos: 13, partidas: 2 })
+  })
+
+  it('un día ya contado no se puede volver a sumar', async () => {
+    await expect(jugar(db, BETO, '2026-10-12T11:00:00-03:00', 8, '2026-10-10')).rejects.toThrow(/desafio-ya-jugado/)
+    expect(await fila('Beto')).toMatchObject({ puntos: 13, partidas: 2 })
+  })
+
+  it('la regla es la misma para los miembros originales', async () => {
+    expect(await fila('Cami')).toMatchObject({ puntos: 3, partidas: 1 })
+    // 11/10: Beto 7 contra Cami 3 → la victoria es de Beto, aunque lo jugó después.
+    expect(await fila('Beto')).toMatchObject({ victorias: 1 })
+  })
+
+  it('la partida que no suma a la sala sigue guardada con su fecha (cuenta en los rankings generales)', async () => {
+    const { rows } = await db.query<{ fecha: string }>(
+      `select to_char(fecha_desafio, 'YYYY-MM-DD') fecha from game_sessions where playerid = $1 order by fecha_desafio`,
+      [BETO]
+    )
+    expect(rows.map((r) => r.fecha)).toEqual(['2026-10-09', '2026-10-10', '2026-10-11'])
   })
 })
 

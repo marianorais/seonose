@@ -92,7 +92,8 @@ interface FilaRpc {
   total: number | null
 }
 
-export const TAMANIO_PAGINA_ANTERIORES = 10
+// El máximo que acepta la base: ~un mes por página.
+export const TAMANIO_PAGINA_ANTERIORES = 30
 
 /** Una página de días anteriores, del más reciente al más viejo. */
 export const listarDesafiosAnteriores = async (

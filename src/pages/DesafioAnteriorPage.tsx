@@ -184,7 +184,7 @@ function DesafioAnteriorPage() {
           </li>
           <li className="flex gap-2">
             <span aria-hidden>🏆</span>
-            <span>Suma al ranking del mes y del año (no al de hoy, que es sólo del desafío del día).</span>
+            <span>Suma a los rankings de ese día, de su mes y de su año, y a tus salas creadas hasta esa fecha.</span>
           </li>
         </ul>
 

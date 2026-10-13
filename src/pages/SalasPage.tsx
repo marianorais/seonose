@@ -308,9 +308,9 @@ function SalasPage() {
         <summary className="cursor-pointer font-semibold">¿Cómo se suman los puntos?</summary>
         <ul className="mt-3 list-disc space-y-1.5 pl-5">
           <li>Cada respuesta correcta del desafío del día vale 1 punto.</li>
-          <li>Cuenta la primera partida de cada día, jugada ese mismo día.</li>
+          <li>Cuenta una partida por día: la primera. Repetir no suma.</li>
           <li>Los puntos se cuentan desde el día en que se creó la sala.</li>
-          <li>Los desafíos anteriores aparecen en la actividad, pero no suman.</li>
+          <li>Suman los desafíos desde el día en que se creó la sala, aunque los juegues después (también si te sumaste tarde). Los de días anteriores a la sala no suman.</li>
           <li>Crear, compartir o entrar a una sala no da puntos: sólo jugar.</li>
         </ul>
       </details>

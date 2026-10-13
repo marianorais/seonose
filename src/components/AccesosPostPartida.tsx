@@ -28,7 +28,7 @@ const AccesosPostPartida = ({ esHistorico }: { esHistorico: boolean }) => {
           icono: '🧠',
           etiqueta: 'Hoy',
           titulo: 'Volvé al desafío de hoy',
-          descripcion: 'Es el que suma para el ranking de hoy.',
+          descripcion: 'Todavía estás a tiempo de jugarlo.',
         },
       ]
     : [

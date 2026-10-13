@@ -1,100 +1,80 @@
 /**
- * /anteriores - Desafíos de días anteriores que todavía se pueden jugar.
+ * /anteriores - Archivo de desafíos, en calendarios mensuales.
  *
- * Si este dispositivo ya jugó una fecha lo dice la base; si una partida quedó
- * a medias en este navegador, se ofrece continuarla.
+ * Los datos salen de la misma consulta paginada de siempre
+ * (`listarDesafiosAnteriores`): qué días tienen desafío y si este dispositivo
+ * ya los jugó. Los meses se cargan solos a medida que se baja, del más reciente
+ * al más viejo. El progreso a medias se lee del navegador ("en curso"). Elegir
+ * un día abre el flujo de desafío anterior que ya existe.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import PaginaBase, { Portada } from '../components/PaginaBase'
+import CalendarioMes from '../components/anteriores/CalendarioMes'
 import { Cargando, EstadoVacio, MensajeError } from '../components/Estados'
+import { getTodayKey } from '../lib/appHelpers'
+import { ARCHIVO_DESDE, claveMes, mesAnterior, mesesEntre, primerDia } from '../lib/calendario'
+import type { DiaArchivo } from '../lib/calendario'
 import { listarDesafiosAnteriores, progresoLocalAnterior } from '../lib/desafios'
 import type { DesafioAnterior } from '../lib/desafios'
-import { formatearFechaLarga } from '../lib/fechas'
 import { obtenerPlayerId } from '../lib/playerIdentity'
 import { mensajeDeError } from '../lib/rpc'
-import type { ErrorRpc } from '../lib/rpc'
+import type { ErrorRpc, ResultadoRpc } from '../lib/rpc'
+
+interface Cargado {
+  fechas: DesafioAnterior[]
+  hayMas: boolean
+  /** Fecha más vieja cargada: desde ahí sigue la próxima página. */
+  cursor: string | null
+}
+
+const VACIO: Cargado = { fechas: [], hayMas: true, cursor: null }
+
+/**
+ * Pide páginas hasta tener completo el mes `mes` (o hasta que no haya más).
+ * Las páginas vienen de la más reciente a la más vieja, así que alcanza con
+ * pasar el primer día del mes.
+ */
+const cargarHasta = async (playerId: string, mes: string, desde: Cargado): Promise<ResultadoRpc<Cargado>> => {
+  let { fechas, hayMas, cursor } = desde
+
+  while (hayMas && (cursor === null || cursor >= primerDia(mes))) {
+    const respuesta = await listarDesafiosAnteriores(playerId, cursor ?? undefined)
+
+    if (!respuesta.ok) return respuesta
+
+    fechas = [...fechas, ...respuesta.datos.fechas]
+    hayMas = respuesta.datos.hayMas && respuesta.datos.fechas.length > 0
+    cursor = respuesta.datos.fechas.at(-1)?.fecha ?? cursor
+  }
+
+  return { ok: true, datos: { fechas, hayMas, cursor } }
+}
 
 type Carga = { estado: 'cargando' } | { estado: 'error'; error: ErrorRpc } | { estado: 'listo' }
 
-const ChipEstado = ({ desafio, enCursoLocal }: { desafio: DesafioAnterior; enCursoLocal: boolean }) => {
-  if (desafio.jugada) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-        <span aria-hidden>✓</span>
-        {desafio.jugadaEnVivo ? 'Lo jugaste ese día' : 'Completado'}
-      </span>
-    )
-  }
-
-  if (enCursoLocal) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">
-        <span aria-hidden>⏳</span>
-        En curso
-      </span>
-    )
-  }
-
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-900">
-      <span aria-hidden>●</span>
-      Disponible
-    </span>
-  )
-}
-
-const FilaDesafio = ({ desafio }: { desafio: DesafioAnterior }) => {
-  const progreso = progresoLocalAnterior(desafio.fecha)
-  const enCursoLocal = Boolean(progreso && !progreso.finished)
-  const completado = desafio.jugada
-  const fechaLarga = formatearFechaLarga(desafio.fecha)
-
-  return (
-    <li className="flex flex-wrap items-center gap-3 rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:flex-nowrap sm:px-5">
-      <div className="min-w-0 flex-1">
-        <p className="text-base font-bold capitalize text-slate-900 sm:text-lg">{fechaLarga}</p>
-        <p className="mt-0.5 text-sm text-slate-600">
-          Desafío #{desafio.numero}
-        </p>
-        <div className="mt-2">
-          <ChipEstado desafio={desafio} enCursoLocal={enCursoLocal} />
-        </div>
-      </div>
-
-      {completado ? (
-        <p className="shrink-0 text-right">
-          <span className="block text-2xl font-bold tabular-nums text-slate-900">
-            {desafio.correctas}/{desafio.total}
-          </span>
-          <span className="block text-xs text-slate-500">correctas</span>
-        </p>
-      ) : (
-        <Link
-          to={`/anteriores/${desafio.fecha}`}
-          aria-label={`${enCursoLocal ? 'Continuar' : 'Jugar'} el desafío del ${fechaLarga}`}
-          className="w-full shrink-0 rounded-2xl bg-slate-900 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-slate-700 sm:w-auto"
-        >
-          {enCursoLocal ? 'Continuar' : 'Jugar'}
-        </Link>
-      )}
-    </li>
-  )
-}
-
 function DesafiosAnterioresPage() {
-  const [desafios, setDesafios] = useState<DesafioAnterior[]>([])
-  const [hayMas, setHayMas] = useState(false)
+  const hoy = useMemo(() => getTodayKey(), [])
+  const playerId = useMemo(() => obtenerPlayerId(), [])
+  const primerMesDelArchivo = claveMes(ARCHIVO_DESDE)
+
+  const [cargado, setCargado] = useState<Cargado>(VACIO)
+  // Mes más viejo que se muestra. Arranca con el mes actual y el anterior.
+  const [hastaMes, setHastaMes] = useState(() => mesAnterior(claveMes(hoy)))
   const [carga, setCarga] = useState<Carga>({ estado: 'cargando' })
   const [cargandoMas, setCargandoMas] = useState(false)
   const [errorMas, setErrorMas] = useState<ErrorRpc | null>(null)
   const [intento, setIntento] = useState(0)
+  // Evita pedir el mismo mes dos veces si el scroll dispara seguido.
+  const pidiendo = useRef(false)
+  // Marca al final de la lista: cuando aparece en pantalla, se carga otro mes.
+  const centinela = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let vigente = true
 
-    void listarDesafiosAnteriores(obtenerPlayerId()).then((respuesta) => {
+    void cargarHasta(playerId, mesAnterior(claveMes(hoy)), VACIO).then((respuesta) => {
       if (!vigente) return
 
       if (!respuesta.ok) {
@@ -102,92 +82,110 @@ function DesafiosAnterioresPage() {
         return
       }
 
-      setDesafios(respuesta.datos.fechas)
-      setHayMas(respuesta.datos.hayMas)
+      setCargado(respuesta.datos)
       setCarga({ estado: 'listo' })
     })
 
     return () => {
       vigente = false
     }
-  }, [intento])
+  }, [playerId, hoy, intento])
 
   const reintentar = useCallback(() => {
     setCarga({ estado: 'cargando' })
     setIntento((valor) => valor + 1)
   }, [])
 
-  const cargarMas = async () => {
-    const ultima = desafios[desafios.length - 1]
+  const meses = mesesEntre(hoy, hastaMes)
+  const quedanMeses = meses[meses.length - 1] > primerMesDelArchivo
 
-    if (!ultima || cargandoMas) return
+  const cargarMesAnterior = useCallback(async () => {
+    if (pidiendo.current) return
+    pidiendo.current = true
+
+    const objetivo = mesAnterior(hastaMes)
 
     setCargandoMas(true)
-    setErrorMas(null)
 
-    const respuesta = await listarDesafiosAnteriores(obtenerPlayerId(), ultima.fecha)
+    const respuesta = await cargarHasta(playerId, objetivo, cargado)
 
     setCargandoMas(false)
+    pidiendo.current = false
 
     if (!respuesta.ok) {
       setErrorMas(respuesta.error)
       return
     }
 
-    setDesafios((actuales) => [...actuales, ...respuesta.datos.fechas])
-    setHayMas(respuesta.datos.hayMas)
-  }
+    setCargado(respuesta.datos)
+    setHastaMes(objetivo)
+  }, [cargado, hastaMes, playerId])
 
-  const pendientes = desafios.filter((desafio) => !desafio.jugada).length
+  // Scroll infinito: cuando el final de la lista se acerca a la pantalla, se
+  // carga el mes anterior. Se vuelve a observar después de cada mes, así sigue
+  // cargando si todavía queda espacio libre en pantalla.
+  useEffect(() => {
+    if (carga.estado !== 'listo' || !quedanMeses || errorMas) return
+
+    const nodo = centinela.current
+
+    if (!nodo) return
+
+    // Navegadores sin IntersectionObserver: se cargan todos los meses de corrido.
+    if (typeof IntersectionObserver === 'undefined') {
+      void Promise.resolve().then(cargarMesAnterior)
+      return
+    }
+
+    const observador = new IntersectionObserver(
+      (entradas) => {
+        if (entradas.some((entrada) => entrada.isIntersecting)) void cargarMesAnterior()
+      },
+      { rootMargin: '600px 0px' }
+    )
+
+    observador.observe(nodo)
+
+    return () => observador.disconnect()
+  }, [carga.estado, quedanMeses, errorMas, cargarMesAnterior])
+
+  const archivo = useMemo(
+    () => new Map<string, DiaArchivo>(cargado.fechas.map((fila) => [fila.fecha, fila])),
+    [cargado.fechas]
+  )
+
+  const enCurso = useCallback((fecha: string) => {
+    const progreso = progresoLocalAnterior(fecha)
+    return Boolean(progreso && !progreso.finished)
+  }, [])
 
   return (
     <PaginaBase>
-      <Portada
-        etiqueta="Desafíos anteriores"
-        icono="📅"
-        titulo="¿Te perdiste algún día?"
-        bajada="Todavía podés jugarlo. Cada día se juega una sola vez desde este dispositivo y suma al ranking del mes y del año."
-      />
+      <Portada etiqueta="Desafíos" icono="📅" titulo="Desafíos anteriores" />
 
-      <div className="mt-5 space-y-3 sm:mt-6">
-        {carga.estado === 'cargando' && <Cargando texto="Buscando desafíos anteriores…" />}
+      <div className="mx-auto mt-5 w-full max-w-lg space-y-4 sm:mt-6 sm:space-y-6">
+        {carga.estado === 'cargando' && <Cargando texto="Armando el calendario…" />}
 
-        {carga.estado === 'error' && (
-          <MensajeError mensaje={mensajeDeError(carga.error)} onReintentar={reintentar} />
-        )}
+        {carga.estado === 'error' && <MensajeError mensaje={mensajeDeError(carga.error)} onReintentar={reintentar} />}
 
-        {carga.estado === 'listo' && desafios.length === 0 && (
-          <EstadoVacio icono="🗓️" titulo="Todavía no hay desafíos anteriores">
-            <p>Volvé mañana: el desafío de hoy va a estar acá.</p>
-          </EstadoVacio>
-        )}
-
-        {carga.estado === 'listo' && desafios.length > 0 && (
+        {carga.estado === 'listo' && (
           <>
-            {pendientes > 0 && (
-              <p className="px-1 text-sm text-slate-600" aria-live="polite">
-                {pendientes === 1 ? 'Tenés 1 desafío para jugar' : `Tenés ${pendientes} desafíos para jugar`}
-                {hayMas ? ' en esta lista (y hay más días).' : '.'}
-              </p>
+            {cargado.fechas.length === 0 && (
+              <EstadoVacio icono="🗓️" titulo="Todavía no hay desafíos anteriores">
+                <p>Volvé mañana: el desafío de hoy va a estar acá.</p>
+              </EstadoVacio>
             )}
 
-            <ul className="space-y-3">
-              {desafios.map((desafio) => (
-                <FilaDesafio key={desafio.fecha} desafio={desafio} />
-              ))}
-            </ul>
+            {meses.map((mes) => (
+              <CalendarioMes key={mes} mes={mes} hoy={hoy} archivo={archivo} enCurso={enCurso} />
+            ))}
 
-            {errorMas && <MensajeError mensaje={mensajeDeError(errorMas)} />}
+            {errorMas && <MensajeError mensaje={mensajeDeError(errorMas)} onReintentar={() => setErrorMas(null)} />}
 
-            {hayMas && (
-              <button
-                type="button"
-                onClick={() => void cargarMas()}
-                disabled={cargandoMas}
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-60"
-              >
-                {cargandoMas ? 'Cargando…' : 'Ver días más viejos'}
-              </button>
+            {quedanMeses && !errorMas && (
+              <div ref={centinela} aria-live="polite">
+                {cargandoMas && <Cargando texto="Cargando más meses…" />}
+              </div>
             )}
           </>
         )}

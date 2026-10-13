@@ -286,7 +286,7 @@ const VistaSala = ({
 
       {!alguienJugo && (
         <EstadoVacio icono="🏁" titulo="El ranking arranca con el próximo desafío">
-          <p>Cada uno suma con la primera partida del día, jugada ese mismo día. ¡Que empiece la competencia!</p>
+          <p>Suma cada desafío desde el día en que se creó la sala, aunque lo juegues después. ¡Que empiece la competencia!</p>
         </EstadoVacio>
       )}
 
@@ -309,7 +309,7 @@ const VistaSala = ({
         </details>
       )}
 
-      <ActividadSala actividad={sala.actividad} />
+      <ActividadSala actividad={sala.actividad} desde={sala.desde} />
 
       {!destacarInvitacion && invitacion}
 

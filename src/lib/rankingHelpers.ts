@@ -413,23 +413,20 @@ const COLUMNAS_SESION_LEGADO = 'id,correctanswers,totalquestions,userip'
  * correr), reintenta con las columnas de siempre y agrupa por IP como antes: el
  * ranking sigue andando en lugar de romperse entero.
  */
-const obtenerSesionesDelRango = async (
-  fromIso: string,
-  toIso: string,
-  incluirAnteriores: boolean
-): Promise<SessionRow[]> => {
-  const consultar = (columnas: string) => {
-    const consulta = supabase
+const obtenerSesionesDelRango = async (desde: string, hasta: string): Promise<SessionRow[]> => {
+  /*
+   * El período se decide por la fecha DEL DESAFÍO (`fecha_desafio`, día de
+   * Argentina), no por el momento en que se guardó la partida. Así un desafío
+   * de ayer jugado hoy suma al ranking de ayer, de su mes y de su año, y nunca
+   * al de hoy.
+   */
+  const consultar = (columnas: string) =>
+    supabase
       .from('game_sessions')
       .select(columnas)
-      .gte('completedat', fromIso)
-      .lt('completedat', toIso)
-
-    // Los desafíos de días anteriores suman al ranking del mes y del año (en
-    // el período en que se jugaron), pero no al de "Hoy": ése es sólo del
-    // desafío del día.
-    return (incluirAnteriores ? consulta : consulta.eq('es_anterior', false)).limit(MAX_SESSIONS)
-  }
+      .gte('fecha_desafio', desde)
+      .lt('fecha_desafio', hasta)
+      .limit(MAX_SESSIONS)
 
   const { data, error } = await consultar(COLUMNAS_SESION)
 
@@ -655,7 +652,8 @@ export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData
   }
 
   const [rows, mapa] = await Promise.all([
-    obtenerSesionesDelRango(fromIso, toIso, period !== 'diario'),
+    // Los límites del período son medianoches argentinas: alcanza con la fecha.
+    obtenerSesionesDelRango(fromIso.slice(0, 10), toIso.slice(0, 10)),
     obtenerMapaIdentidades(MAX_ALIASES),
   ])
 

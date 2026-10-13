@@ -189,6 +189,34 @@ describe('pantalla de la sala', () => {
     expect(screen.getByText('Jugá el desafío de hoy y sumá puntos')).toBeTruthy()
   })
 
+  it('la actividad sólo muestra desafíos desde la creación de la sala, sin aclaraciones de "no suma"', async () => {
+    const actividad = (fecha: string, esAnterior: boolean, alias: string) => ({
+      clave: `p-${alias}`,
+      alias,
+      fecha,
+      es_anterior: esAnterior,
+      correctas: 6,
+      total: 8,
+      completada_en: '2026-10-12T15:00:00Z',
+    })
+    respuestas.ranking_sala = () => {
+      const respuesta = detalle([fila({ es_actual: true, partidas: 1, puntos: 6 })])
+      return { ...respuesta, data: { ...(respuesta.data as Record<string, unknown>), actividad: [
+        actividad('2026-10-08', true, 'Antes'), // anterior a la sala (creada el 09/10)
+        actividad('2026-10-09', true, 'Recuperado'), // el día de creación: suma
+        actividad('2026-10-11', false, 'EnVivo'),
+      ] } }
+    }
+
+    renderizar('/sala/abcd2345xy')
+
+    expect(await screen.findByText('Actividad reciente')).toBeTruthy()
+    expect(screen.getByText('Recuperado')).toBeTruthy()
+    expect(screen.getByText('EnVivo')).toBeTruthy()
+    expect(screen.queryByText('Antes')).toBeNull()
+    expect(screen.queryByText(/no suma/)).toBeNull()
+  })
+
   it('copia el link de invitación', async () => {
     const escribir = vi.fn(async () => undefined)
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: escribir }, configurable: true })

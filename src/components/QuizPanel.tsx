@@ -469,7 +469,7 @@ const QuizPanel = ({
       const barra = answers.map((a) => (a.isCorrect ? '🟩' : '🟥')).join('')
 
       return [
-        `🧠 Se o NoSe #${gameNumber} ${correctCount}/${total}`,
+        `🧠 Se o No Se #${gameNumber} ${correctCount}/${total}`,
         barra,
         ...(esAnterior ? [`📅 Desafío del ${formatearFechaLarga(questionDate)}`] : []),
         `👉 ${window.location.origin}`,

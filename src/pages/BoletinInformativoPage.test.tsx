@@ -61,4 +61,44 @@ describe('Boletín Informativo', () => {
 
     expect(await screen.findByText('Todavía no hay novedades disponibles.')).toBeTruthy()
   })
+
+  it('aplica negrita y enlaces Markdown sin interpretar HTML y conserva saltos de línea', async () => {
+    fetchBoletinesActivos.mockResolvedValue([
+      {
+        id: 3,
+        titulo: 'Formato',
+        descripcion: '**Importante**\n[Visitar sitio](https://example.com)\n<script>alert(1)</script>',
+        activo: true,
+        fecha_creacion: '2026-10-11T08:00:00Z',
+        fecha_actualizacion: '2026-10-11T08:00:00Z',
+      },
+    ])
+
+    renderizar()
+
+    expect(await screen.findByText('Importante', { selector: 'strong' })).toBeTruthy()
+    const enlace = screen.getByRole('link', { name: 'Visitar sitio' })
+    expect(enlace.getAttribute('href')).toBe('https://example.com')
+    expect(enlace.getAttribute('target')).toBe('_blank')
+    expect(enlace.getAttribute('rel')).toBe('noopener noreferrer')
+    expect(screen.getByText('<script>alert(1)</script>')).toBeTruthy()
+  })
+
+  it('no convierte enlaces Markdown con protocolos inseguros en hipervínculos', async () => {
+    fetchBoletinesActivos.mockResolvedValue([
+      {
+        id: 4,
+        titulo: 'Enlace no seguro',
+        descripcion: '[Abrir](javascript:alert(1))',
+        activo: true,
+        fecha_creacion: '2026-10-11T08:00:00Z',
+        fecha_actualizacion: '2026-10-11T08:00:00Z',
+      },
+    ])
+
+    renderizar()
+
+    expect(await screen.findByText('[Abrir](javascript:alert(1))')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Abrir' })).toBeNull()
+  })
 })

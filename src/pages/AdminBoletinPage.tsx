@@ -184,9 +184,13 @@ function AdminBoletinPage() {
                 value={descripcion}
                 onChange={(event) => setDescripcion(event.target.value)}
                 rows={10}
-                placeholder="Escribí el contenido del boletín, con listas, emojis y párrafos..."
+                placeholder="Escribí el contenido del boletín, con listas, emojis, párrafos y formato..."
                 className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
               />
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Formato opcional: <code>**texto en negrita**</code> y{' '}
+                <code>[texto del enlace](https://ejemplo.com)</code>. Los saltos de línea se conservan.
+              </p>
             </div>
 
             <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">

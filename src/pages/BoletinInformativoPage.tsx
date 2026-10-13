@@ -8,6 +8,43 @@ import StatsModal from '../components/StatsModal'
 import { loadThemeConfig } from '../lib/themeConfig'
 import { fetchBoletinesActivos, type Boletin } from '../lib/boletinesHelpers'
 
+const renderizarDescripcion = (texto: string) => {
+  const formato = /\*\*(.+?)\*\*|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g
+  const nodos: React.ReactNode[] = []
+  let inicio = 0
+  let coincidencia: RegExpExecArray | null
+
+  while ((coincidencia = formato.exec(texto)) !== null) {
+    if (coincidencia.index > inicio) {
+      nodos.push(texto.slice(inicio, coincidencia.index))
+    }
+
+    if (coincidencia[1] !== undefined) {
+      nodos.push(<strong key={coincidencia.index}>{coincidencia[1]}</strong>)
+    } else {
+      nodos.push(
+        <a
+          key={coincidencia.index}
+          href={coincidencia[3]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sky-700 underline decoration-sky-400 underline-offset-2 hover:text-sky-900"
+        >
+          {coincidencia[2]}
+        </a>
+      )
+    }
+
+    inicio = formato.lastIndex
+  }
+
+  if (inicio < texto.length) {
+    nodos.push(texto.slice(inicio))
+  }
+
+  return nodos
+}
+
 const formatearFecha = (iso: string) => {
   try {
     return new Intl.DateTimeFormat('es-AR', {
@@ -100,7 +137,7 @@ function BoletinInformativoPage() {
                 </div>
 
                 <div className="whitespace-pre-wrap break-words text-base leading-7 text-slate-700">
-                  {boletin.descripcion}
+                  {renderizarDescripcion(boletin.descripcion)}
                 </div>
               </article>
             ))}

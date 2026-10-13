@@ -13,6 +13,8 @@ const SalaPage = lazy(() => import('./pages/SalaPage.tsx'))
 const DesafiosAnterioresPage = lazy(() => import('./pages/DesafiosAnterioresPage.tsx'))
 const DesafioAnteriorPage = lazy(() => import('./pages/DesafioAnteriorPage.tsx'))
 const AdminPreguntasPage = lazy(() => import('./pages/PanelAdministracionPreguntas.tsx'))
+const BoletinInformativoPage = lazy(() => import('./pages/BoletinInformativoPage.tsx'))
+const AdminBoletinPage = lazy(() => import('./pages/AdminBoletinPage.tsx'))
 const GameSettingsPage = lazy(() => import('./pages/GameSettingsPage.tsx'))
 const MejorasPage = lazy(() => import('./pages/MejorasPage.tsx'))
 
@@ -38,8 +40,10 @@ const Rutas = () => (
         element={<GameSettingsPage />}
       />
       <Route path="/estadisticas" element={<EstadisticasPage />} />
+      <Route path="/boletin" element={<BoletinInformativoPage />} />
       <Route path="/contacto" element={<ContactoPage />} />
       <Route path="/salas" element={<SalasPage />} />
+      <Route path="/adminBoletin" element={<AdminBoletinPage />} />
       <Route path="/sala/:codigo" element={<SalaPage />} />
       <Route path="/anteriores" element={<DesafiosAnterioresPage />} />
       <Route path="/anteriores/:fecha" element={<DesafioAnteriorPage />} />

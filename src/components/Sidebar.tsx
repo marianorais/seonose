@@ -105,6 +105,13 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           </div>
 
           <div className="space-y-3">
+            <EnlaceNav to="/boletin" onClose={onClose} activo={pathname === '/boletin'}>
+              📣 Boletín Informativo
+            </EnlaceNav>
+            <p className="text-xs text-gray-500">Novedades, mejoras y anuncios del sistema.</p>
+          </div>
+
+          <div className="space-y-3">
             <h3 className="text-xs uppercase tracking-widest text-gray-500">Contacto</h3>
             <EnlaceNav to="/contacto" onClose={onClose} activo={pathname === '/contacto'}>
               ✉️ Contáctenos

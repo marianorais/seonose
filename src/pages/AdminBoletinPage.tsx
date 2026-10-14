@@ -189,7 +189,8 @@ function AdminBoletinPage() {
               />
               <p className="mt-2 text-xs leading-5 text-slate-500">
                 Formato opcional: <code>**texto en negrita**</code> y{' '}
-                <code>[texto del enlace](https://ejemplo.com)</code>. Los saltos de línea se conservan.
+                <code>[texto del enlace](https://ejemplo.com)</code>. Las URL pegadas y las menciones de Instagram
+                como <code>@se_o_no_se</code> también se hacen clickeables. Los saltos de línea se conservan.
               </p>
             </div>
 

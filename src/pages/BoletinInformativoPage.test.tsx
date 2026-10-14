@@ -101,4 +101,48 @@ describe('Boletín Informativo', () => {
     expect(await screen.findByText('[Abrir](javascript:alert(1))')).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Abrir' })).toBeNull()
   })
+
+  it('convierte URL pegadas y menciones de Instagram en enlaces clickeables', async () => {
+    const urlInstagram = 'https://instagram.com/se_o_no_se?vrfl=aG14aDgzbHhtaGoz&utm_source=qr'
+    fetchBoletinesActivos.mockResolvedValue([
+      {
+        id: 5,
+        titulo: 'Instagram',
+        descripcion: `Seguinos en @se_o_no_se 🛜\n${urlInstagram}`,
+        activo: true,
+        fecha_creacion: '2026-10-11T08:00:00Z',
+        fecha_actualizacion: '2026-10-11T08:00:00Z',
+      },
+    ])
+
+    renderizar()
+
+    const mencion = await screen.findByRole('link', { name: '@se_o_no_se' })
+    expect(mencion.getAttribute('href')).toBe('https://www.instagram.com/se_o_no_se/')
+
+    const urlPegada = screen.getByRole('link', { name: urlInstagram })
+    expect(urlPegada.getAttribute('href')).toBe(urlInstagram)
+    expect(urlPegada.getAttribute('target')).toBe('_blank')
+    expect(urlPegada.getAttribute('rel')).toBe('noopener noreferrer')
+  })
+
+  it('mantiene la puntuación final fuera del enlace y no convierte menciones dentro de emails', async () => {
+    fetchBoletinesActivos.mockResolvedValue([
+      {
+        id: 6,
+        titulo: 'Texto con enlace y correo',
+        descripcion: 'Visitá https://example.com. Escribinos a equipo@example.com',
+        activo: true,
+        fecha_creacion: '2026-10-11T08:00:00Z',
+        fecha_actualizacion: '2026-10-11T08:00:00Z',
+      },
+    ])
+
+    renderizar()
+
+    const enlace = await screen.findByRole('link', { name: 'https://example.com' })
+    expect(enlace.getAttribute('href')).toBe('https://example.com')
+    expect(enlace.parentElement?.textContent).toBe('Visitá https://example.com. Escribinos a equipo@example.com')
+    expect(screen.queryByRole('link', { name: 'equipo@example.com' })).toBeNull()
+  })
 })

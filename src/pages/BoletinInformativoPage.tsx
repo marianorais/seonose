@@ -9,33 +9,58 @@ import { loadThemeConfig } from '../lib/themeConfig'
 import { fetchBoletinesActivos, type Boletin } from '../lib/boletinesHelpers'
 
 const renderizarDescripcion = (texto: string) => {
-  const formato = /\*\*(.+?)\*\*|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g
+  const formato =
+    /\*\*(.+?)\*\*|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>()]+)|@([A-Za-z0-9._]{1,30})/g
   const nodos: React.ReactNode[] = []
   let inicio = 0
   let coincidencia: RegExpExecArray | null
 
   while ((coincidencia = formato.exec(texto)) !== null) {
+    const esMencion = coincidencia[5] !== undefined
+    const caracterAnterior = texto.charAt(coincidencia.index - 1)
+    if (esMencion && /[A-Za-z0-9_.+-]/.test(caracterAnterior)) {
+      continue
+    }
+
     if (coincidencia.index > inicio) {
       nodos.push(texto.slice(inicio, coincidencia.index))
     }
 
+    let finCoincidencia = formato.lastIndex
     if (coincidencia[1] !== undefined) {
       nodos.push(<strong key={coincidencia.index}>{coincidencia[1]}</strong>)
     } else {
+      const urlMarkdown = coincidencia[3]
+      const urlDirecta = coincidencia[4]
+      const handleInstagram = coincidencia[5]
+      const url = urlMarkdown ?? (
+        urlDirecta
+          ? urlDirecta.replace(/[.,!?;:]+$/, '')
+          : `https://www.instagram.com/${handleInstagram}/`
+      )
+      const textoEnlace = coincidencia[2] ?? (
+        urlDirecta
+          ? urlDirecta.slice(0, url.length)
+          : `@${handleInstagram}`
+      )
+      if (urlDirecta) {
+        finCoincidencia = coincidencia.index + url.length
+      }
+
       nodos.push(
         <a
           key={coincidencia.index}
-          href={coincidencia[3]}
+          href={url}
           target="_blank"
           rel="noopener noreferrer"
           className="text-sky-700 underline decoration-sky-400 underline-offset-2 hover:text-sky-900"
         >
-          {coincidencia[2]}
+          {textoEnlace}
         </a>
       )
     }
 
-    inicio = formato.lastIndex
+    inicio = finCoincidencia
   }
 
   if (inicio < texto.length) {

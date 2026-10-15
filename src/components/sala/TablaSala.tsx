@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { construirIdentidad } from '../../lib/rankingHelpers'
 import { VISTAS_RANKING_SALA, ordenarTablaSala } from '../../lib/salas'
 import type { FilaSala, VistaRankingSala } from '../../lib/salas'
+import AvatarJugador from '../AvatarJugador'
 
 type FilaOrdenada = FilaSala & { puesto: number }
 
@@ -21,17 +22,16 @@ const valorPrincipal = (fila: FilaSala, vista: VistaRankingSala) => {
 const detalle = (fila: FilaSala) =>
   `${fila.partidas} ${fila.partidas === 1 ? 'partida' : 'partidas'} · ${fila.correctas}/${fila.total} · ${fila.porcentaje.toLocaleString('es-AR')}%`
 
-const Avatar = ({ clave, grande = false }: { clave: string; grande?: boolean }) => {
+const Avatar = ({ clave, avatar, grande = false }: { clave: string; avatar: string | null; grande?: boolean }) => {
   const { emoji, hue } = construirIdentidad(clave)
 
   return (
-    <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-full ring-2 ring-white ${grande ? 'h-12 w-12 text-2xl' : 'h-9 w-9 text-lg'}`}
-      style={{ backgroundColor: `hsl(${hue} 85% 92%)` }}
-      aria-hidden
-    >
-      {emoji}
-    </span>
+    <AvatarJugador
+      avatar={avatar}
+      predeterminado={emoji}
+      color={`hsl(${hue} 85% 92%)`}
+      className={grande ? 'h-12 w-12 text-2xl' : 'h-9 w-9 text-lg'}
+    />
   )
 }
 
@@ -52,7 +52,7 @@ const TarjetaPodio = ({ fila, vista, lugar }: { fila: FilaOrdenada; vista: Vista
       <span className={`shrink-0 leading-none ${campeon ? 'text-3xl' : 'text-2xl'}`} role="img" aria-label={`Puesto ${lugar}`}>
         {estilo.medalla}
       </span>
-      <Avatar clave={fila.clave} grande={campeon} />
+      <Avatar clave={fila.clave} avatar={fila.avatar} grande={campeon} />
       <div className="min-w-0 flex-1 sm:w-full">
         <div className="flex items-center gap-2 sm:justify-center">
           <p className="truncate font-bold text-slate-900">{fila.alias}</p>
@@ -74,7 +74,7 @@ const FilaLista = ({ fila, vista }: { fila: FilaOrdenada; vista: VistaRankingSal
     }`}
   >
     <span className="w-6 shrink-0 text-center text-sm font-bold tabular-nums text-slate-500">{fila.puesto}</span>
-    <Avatar clave={fila.clave} />
+    <Avatar clave={fila.clave} avatar={fila.avatar} />
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-2">
         <p className="truncate text-sm font-semibold text-slate-900 sm:text-base">{fila.alias}</p>

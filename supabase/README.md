@@ -12,6 +12,7 @@ ni funciones pagas. Las salas y los desafíos anteriores agregan muy pocos datos
 | `migrations/20261013000100_desafios_anteriores.sql` | Aplicado | 2 columnas en `game_sessions` (`fecha_desafio`, `es_anterior`), un control al guardar y 2 funciones de lectura. |
 | `migrations/20261013000200_salas.sql` | Aplicado | Tablas `salas` y `sala_miembros` y 7 funciones. |
 | `migrations/20261013000300_salas_suman_anteriores.sql` | Pendiente | Corrige el puntaje de las salas: los desafíos anteriores suman si su fecha es igual o posterior a la creación de la sala. |
+| `migrations/20261015000100_perfil_jugador.sql` | Pendiente | Agrega `player_aliases.avatar`, la RPC del perfil y expone avatares en rankings y actividad de salas. |
 
 Todos son compatibles con el sitio publicado: no le quitan permisos ni cambian
 cómo guarda. Se pueden correr más de una vez.
@@ -35,6 +36,12 @@ antes de tiempo, sólo para probar la reversión. **No volver a correrlas.**
   para los días iguales o posteriores a la creación de la sala, se hayan jugado
   en vivo o como desafío anterior, y aunque la persona se haya unido después.
   Los días anteriores a la sala y las repeticiones no suman.
+- **Perfil:** el alias y el avatar se guardan en la fila principal existente de
+  `player_aliases`. Sólo se agrega la columna `avatar`; el alias no se duplica,
+  y ni `playerid` ni el historial de partidas cambian.
+- **Fotos propias:** por ahora se ofrecen emojis predefinidos. El proyecto no
+  tiene bucket ni infraestructura para imágenes; antes de ofrecer una subida
+  real hay que configurar Supabase Storage y sus políticas.
 
 ## Pruebas
 

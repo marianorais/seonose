@@ -65,6 +65,9 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               <EnlaceNav to="/" onClose={onClose} activo={pathname === '/'}>
                 🏠 Inicio
               </EnlaceNav>
+              <EnlaceNav to="/perfil" onClose={onClose} activo={pathname === '/perfil'}>
+                👤 Perfil
+              </EnlaceNav>
 
               {/*
                 El ranking es un destino, así que va en Navegación y no al final.

@@ -10,6 +10,7 @@ SeONose es una aplicación web de quiz diario construida con React, TypeScript, 
 - Compartir resultado por WhatsApp, Twitter, Telegram, Email y portapapeles
 - Temas visuales con modo claro, oscuro, negro, azul y sepia
 - Estadísticas de partidas guardadas
+- Perfil con edición de alias y selección de avatar
 
 ## 💻 Desarrollo local
 

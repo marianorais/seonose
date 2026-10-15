@@ -89,6 +89,7 @@ export interface VistaPreviaSala {
 export interface FilaSala {
   clave: string
   alias: string
+  avatar: string | null
   puntos: number
   partidas: number
   correctas: number
@@ -103,6 +104,7 @@ export interface FilaSala {
 export interface ActividadSala {
   clave: string
   alias: string
+  avatar: string | null
   fecha: string
   numero: number
   modo: 'diario' | 'historico'
@@ -207,6 +209,7 @@ export const eliminarSala = async (codigo: string, playerId: string) =>
 const aFila = (fila: Record<string, unknown>): FilaSala => ({
   clave: String(fila.clave),
   alias: String(fila.alias ?? 'Sin alias'),
+  avatar: typeof fila.avatar === 'string' ? fila.avatar : null,
   puntos: Number(fila.puntos),
   partidas: Number(fila.partidas),
   correctas: Number(fila.correctas),
@@ -221,6 +224,7 @@ const aFila = (fila: Record<string, unknown>): FilaSala => ({
 const aActividad = (fila: Record<string, unknown>): ActividadSala => ({
   clave: String(fila.clave),
   alias: String(fila.alias ?? 'Sin alias'),
+  avatar: typeof fila.avatar === 'string' ? fila.avatar : null,
   fecha: String(fila.fecha),
   numero: numeroDeDesafio(String(fila.fecha)),
   modo: fila.es_anterior ? 'historico' : 'diario',

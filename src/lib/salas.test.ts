@@ -13,6 +13,7 @@ import type { FilaSala } from './salas'
 const fila = (datos: Partial<FilaSala>): FilaSala => ({
   clave: 'p000000000000',
   alias: 'Alguien',
+  avatar: null,
   puntos: 0,
   partidas: 0,
   correctas: 0,

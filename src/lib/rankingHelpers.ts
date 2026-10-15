@@ -37,6 +37,7 @@ export interface RankingEntry {
   playerKey: string
   alias: string
   emoji: string
+  avatar?: string | null
   /** Tono HSL derivado del hash, para el avatar. */
   hue: number
   position: number
@@ -760,6 +761,7 @@ export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData
       playerKey: `p${hashFnv1a(accumulator.playerKey).toString(36)}`,
       ...identity,
       alias: aliasElegido ?? identity.alias,
+      avatar: mapa.avatarPorGrupo?.get(accumulator.playerKey) ?? null,
       position: 0,
       games: accumulator.games,
       correct: accumulator.correct,

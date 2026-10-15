@@ -15,6 +15,7 @@ interface Partida {
 }
 
 let partidas: Partida[] = []
+let identidades: { playerid: string; alias: string; grupo: string; avatar: string }[] = []
 const filtros: string[][] = []
 
 vi.mock('./supabase', () => {
@@ -46,7 +47,9 @@ vi.mock('./supabase', () => {
         const filas =
           tabla === 'game_sessions'
             ? partidas.filter((fila) => condiciones.every((condicion) => condicion(fila as unknown as Record<string, unknown>)))
-            : []
+            : tabla === 'player_aliases'
+              ? identidades
+              : []
         return Promise.resolve({ data: filas, error: null }).then(resolver)
       },
     }
@@ -58,6 +61,7 @@ vi.mock('./supabase', () => {
 })
 
 const { obtenerRanking } = await import('./rankingHelpers')
+const { invalidarCacheIdentidades } = await import('./aliasHelpers')
 
 const partida = (id: number, fecha: string, completada: string, correctas: number, esAnterior = false): Partida => ({
   id,
@@ -72,6 +76,8 @@ const partida = (id: number, fecha: string, completada: string, correctas: numbe
 
 beforeEach(() => {
   filtros.length = 0
+  identidades = []
+  invalidarCacheIdentidades()
   window.localStorage.clear()
   // La identidad de este navegador es la del jugador de las partidas simuladas.
   window.localStorage.setItem('seonose-player-id', 'jugador-0001')
@@ -100,6 +106,19 @@ describe('el período se decide por la fecha del desafío, no por cuándo se jug
   it('Hoy: sólo el desafío de hoy, aunque los anteriores se hayan jugado hoy', async () => {
     expect(await puntosDe('diario')).toBe(5)
     expect(filtros[0]).toEqual(expect.arrayContaining(['fecha_desafio>=2026-10-13', 'fecha_desafio<2026-10-14']))
+  })
+
+  it('usa el alias y avatar guardados en el ranking general', async () => {
+    identidades = [{
+      playerid: 'jugador-0001',
+      alias: 'Alias nuevo',
+      grupo: 'jugador-0001',
+      avatar: '🦊',
+    }]
+
+    const jugador = (await obtenerRanking('diario')).players.find((entry) => entry.isCurrentPlayer)
+
+    expect(jugador).toMatchObject({ alias: 'Alias nuevo', avatar: '🦊' })
   })
 
   it('Mes: suman los desafíos de octubre; el del 30/09 queda en septiembre', async () => {

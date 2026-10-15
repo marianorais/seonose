@@ -62,18 +62,22 @@ export interface MapaIdentidades {
   grupoPorIdentidad: Map<string, string>
   /** Grupo -> alias elegido por esa persona. */
   aliasPorGrupo: Map<string, string>
+  /** Grupo -> emoji elegido como avatar. */
+  avatarPorGrupo: Map<string, string>
 }
 
 interface FilaAlias {
   playerid: string | null
   alias: string | null
   grupo: string | null
+  avatar: string | null
 }
 
 const MAPA_VACIO: MapaIdentidades = {
   ok: false,
   grupoPorIdentidad: new Map(),
   aliasPorGrupo: new Map(),
+  avatarPorGrupo: new Map(),
 }
 
 /**
@@ -93,7 +97,7 @@ export const obtenerMapaIdentidades = (limite: number): Promise<MapaIdentidades>
   cacheMapa = (async () => {
     const { data, error } = await supabase
       .from('player_aliases')
-      .select('playerid,alias,grupo')
+      .select('playerid,alias,grupo,avatar')
       .limit(limite)
 
     if (error) {
@@ -107,6 +111,7 @@ export const obtenerMapaIdentidades = (limite: number): Promise<MapaIdentidades>
 
     const grupoPorIdentidad = new Map<string, string>()
     const aliasPorGrupo = new Map<string, string>()
+    const avatarPorGrupo = new Map<string, string>()
 
     for (const fila of (data ?? []) as FilaAlias[]) {
       if (!fila.playerid) continue
@@ -117,10 +122,13 @@ export const obtenerMapaIdentidades = (limite: number): Promise<MapaIdentidades>
       grupoPorIdentidad.set(fila.playerid, grupo)
 
       // El nombre del grupo es el de la fila principal (`playerid === grupo`).
-      if (fila.alias && fila.playerid === grupo) aliasPorGrupo.set(grupo, fila.alias)
+      if (fila.playerid === grupo) {
+        if (fila.alias) aliasPorGrupo.set(grupo, fila.alias)
+        if (fila.avatar) avatarPorGrupo.set(grupo, fila.avatar)
+      }
     }
 
-    return { ok: true, grupoPorIdentidad, aliasPorGrupo }
+    return { ok: true, grupoPorIdentidad, aliasPorGrupo, avatarPorGrupo }
   })()
 
   return cacheMapa
@@ -144,6 +152,68 @@ export const obtenerAliasDePlayer = async (
   if (alias) guardarAliasLocal(alias)
 
   return { ok: true, alias }
+}
+
+export interface PerfilJugador {
+  alias: string | null
+  avatar: string | null
+}
+
+export const obtenerPerfilDePlayer = async (
+  playerId: string
+): Promise<{ ok: boolean; perfil: PerfilJugador }> => {
+  const mapa = await obtenerMapaIdentidades(5000)
+
+  if (!mapa.ok) return { ok: false, perfil: { alias: null, avatar: null } }
+
+  const grupo = mapa.grupoPorIdentidad.get(playerId) ?? playerId
+
+  return {
+    ok: true,
+    perfil: {
+      alias: mapa.aliasPorGrupo.get(grupo) ?? null,
+      avatar: mapa.avatarPorGrupo.get(grupo) ?? null,
+    },
+  }
+}
+
+export type ResultadoPerfil =
+  | { ok: true; perfil: { alias: string; avatar: string } }
+  | { ok: false; motivo: 'alias-invalido' | 'avatar-invalido' | 'duplicado' | 'error' }
+
+export const guardarPerfil = async (
+  playerId: string,
+  aliasIngresado: string,
+  avatar: string
+): Promise<ResultadoPerfil> => {
+  const alias = aliasIngresado.trim()
+
+  if (!alias || alias.length > 30) return { ok: false, motivo: 'alias-invalido' }
+
+  const { data, error } = await supabase.rpc('guardar_perfil_jugador', {
+    p_playerid: playerId,
+    p_alias: alias,
+    p_avatar: avatar,
+  })
+
+  if (error) {
+    console.error('No se pudo guardar el perfil:', error.message)
+    return { ok: false, motivo: 'error' }
+  }
+
+  const respuesta = (data ?? {}) as { estado?: string; alias?: string; avatar?: string }
+
+  if (respuesta.estado === 'ok') {
+    const perfil = { alias: respuesta.alias ?? alias, avatar: respuesta.avatar ?? avatar }
+    guardarAliasLocal(perfil.alias)
+    invalidarCacheIdentidades()
+    return { ok: true, perfil }
+  }
+
+  if (respuesta.estado === 'duplicado') return { ok: false, motivo: 'duplicado' }
+  if (respuesta.estado === 'avatar-invalido') return { ok: false, motivo: 'avatar-invalido' }
+
+  return { ok: false, motivo: 'alias-invalido' }
 }
 
 interface RespuestaFuncion {

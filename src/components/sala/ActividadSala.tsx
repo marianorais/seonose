@@ -1,5 +1,7 @@
 import { formatearHaceCuanto } from '../../lib/fechas'
+import { construirIdentidad } from '../../lib/rankingHelpers'
 import type { ActividadSala as Actividad } from '../../lib/salas'
+import AvatarJugador from '../AvatarJugador'
 
 /**
  * Últimas partidas del grupo. Sólo resultados (aciertos sobre total), nunca
@@ -24,6 +26,12 @@ const ActividadSala = ({ actividad, desde }: { actividad: Actividad[]; desde: st
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl border border-slate-200 bg-white">
         {deLaSala.map((item) => (
           <li key={`${item.clave}-${item.completadaEn}`} className="flex items-center gap-3 px-4 py-3">
+            <AvatarJugador
+              avatar={item.avatar}
+              predeterminado={construirIdentidad(item.clave).emoji}
+              color={`hsl(${construirIdentidad(item.clave).hue} 85% 92%)`}
+              className="h-9 w-9 text-lg"
+            />
             <span className="text-xl" aria-hidden>
               {item.modo === 'historico' ? '📅' : '🧠'}
             </span>

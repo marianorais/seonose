@@ -5,6 +5,7 @@ import App from './App.tsx'
 import EstadisticasPage from './pages/EstadisticasPage.tsx'
 import ContactoPage from './pages/ContactoPage.tsx'
 import RankingPage from './pages/RankingPage.tsx'
+import PerfilPage from './pages/PerfilPage.tsx'
 
 // Se cargan recién cuando se visitan: el desafío diario no tiene que esperar
 // a descargar pantallas que la mayoría no abre en esa visita.
@@ -35,6 +36,7 @@ const Rutas = () => (
         element={<AdminPreguntasPage />}
       />
       <Route path="/ranking" element={<RankingPage />} />
+      <Route path="/perfil" element={<PerfilPage />} />
       <Route
         path="/configuraciones"
         element={<GameSettingsPage />}

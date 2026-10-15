@@ -24,6 +24,7 @@ import {
 } from '../lib/aliasHelpers'
 import { obtenerPlayerId } from '../lib/playerIdentity'
 import AliasPrompt from './AliasPrompt'
+import AvatarJugador from './AvatarJugador'
 
 /** Paleta y medalla de cada puesto del podio. */
 const PODIUM_STYLES = {
@@ -76,13 +77,12 @@ const PlayerAvatar = ({ entry, size = 'md' }: { entry: RankingEntry; size?: 'sm'
   }[size]
 
   return (
-    <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-full ring-2 ring-white ${dimensions}`}
-      style={{ backgroundColor: `hsl(${entry.hue} 85% 92%)` }}
-      aria-hidden
-    >
-      {entry.emoji}
-    </span>
+    <AvatarJugador
+      avatar={entry.avatar}
+      predeterminado={entry.emoji}
+      color={`hsl(${entry.hue} 85% 92%)`}
+      className={dimensions}
+    />
   )
 }
 

@@ -27,6 +27,7 @@ interface HeaderProps {
 const Header = ({ onOpenSidebar, onOpenSettings, onOpenStats, compacto = false }: HeaderProps) => {
   const { pathname } = useLocation()
   const enRanking = pathname === '/ranking'
+  const enPerfil = pathname === '/perfil'
   const enSalas = pathname === '/salas' || pathname.startsWith('/sala/')
 
   // Un solo lugar donde cambia la densidad: el resto del markup es idéntico.
@@ -111,10 +112,20 @@ const Header = ({ onOpenSidebar, onOpenSettings, onOpenStats, compacto = false }
             {!compacto && <span className="hidden text-sm sm:inline">Salas</span>}
           </Link>
 
-          {/* Decorativo: en celular se oculta para dejarle lugar al acceso a Salas. */}
-          {!compacto && (
-            <span className="hidden rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 sm:inline">👤</span>
-          )}
+          <Link
+            to="/perfil"
+            aria-label="Editar perfil"
+            aria-current={enPerfil ? 'page' : undefined}
+            title="Perfil"
+            className={`inline-flex items-center gap-2 rounded-2xl border font-semibold shadow-sm transition ${d.control} ${
+              enPerfil
+                ? 'border-violet-400 bg-violet-100 text-violet-900'
+                : 'border-violet-300 bg-violet-50 text-violet-800 hover:bg-violet-100'
+            }`}
+          >
+            <span aria-hidden>👤</span>
+            {!compacto && <span className="hidden text-sm sm:inline">Perfil</span>}
+          </Link>
 
           <button
             type="button"

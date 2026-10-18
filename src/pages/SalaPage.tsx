@@ -198,6 +198,11 @@ const mensajeInvitar = (integrantes: number) => {
   return 'Cuantos más, mejor. Pasale el link a quien quieras.'
 }
 
+const fechaCompetencia = (fecha: string) =>
+  new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' }).format(
+    new Date(fecha)
+  )
+
 const VistaSala = ({
   sala,
   esNueva,
@@ -213,6 +218,9 @@ const VistaSala = ({
   const yo = sala.tabla.find((fila) => fila.esActual) ?? null
   const alguienJugo = sala.tabla.some((fila) => fila.partidas > 0)
   const destacarInvitacion = esNueva || sala.integrantes < 3
+  const diasRestantes = sala.temporada.diasRestantes
+  const cierreReciente = sala.cierres[sala.cierres.length - 1] ?? null
+  const campeonAnterior = sala.historial[0] ?? null
 
   const invitacion = (
     <section aria-labelledby="titulo-invitar" className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -254,6 +262,46 @@ const VistaSala = ({
           </p>
         )}
       </Portada>
+
+      <section className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm" aria-label="Temporada actual">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-700">Competencia de sala</p>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">Temporada de 30 días</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {fechaCompetencia(sala.temporada.empiezaEn)} – {fechaCompetencia(sala.temporada.terminaEn)}
+            </p>
+          </div>
+          <p className="rounded-full bg-white px-4 py-2 text-sm font-bold text-indigo-900 ring-1 ring-indigo-200">
+            {diasRestantes === 0 ? 'Cierre pendiente' : `Quedan ${diasRestantes} ${diasRestantes === 1 ? 'día' : 'días'}`}
+          </p>
+        </div>
+        <p className="mt-3 text-sm text-slate-600">
+          Al cerrar se conservan las partidas y se reinician sólo los puntos de competencia. Cada campeón suma una copa permanente.
+        </p>
+        {campeonAnterior && (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-bold text-amber-950">🏆 Campeón de la temporada anterior</p>
+            <p className="mt-1 text-sm text-slate-800">
+              {campeonAnterior.campeones.length
+                ? campeonAnterior.campeones.map((campeon) => `${campeon.alias} · ${campeon.puntaje} pts`).join(' / ')
+                : 'Esta temporada terminó sin puntos válidos.'}
+            </p>
+          </div>
+        )}
+      </section>
+
+      {cierreReciente && (
+        <section role="status" className="rounded-3xl border border-amber-300 bg-amber-50 px-5 py-4 shadow-sm">
+          <p className="font-bold text-amber-950">🎉 ¡Terminó una temporada y ya empezó otra!</p>
+          <p className="mt-1 text-sm text-slate-700">
+            {cierreReciente.campeones.length
+              ? `La copa de sala es para ${cierreReciente.campeones.map((campeon) => `${campeon.alias} (${campeon.puntaje} pts)`).join(' y ')}.`
+              : 'No hubo partidas con puntos válidos; esta vez no se otorgó una copa.'}
+            {' '}Las partidas y los trofeos anteriores siguen guardados.
+          </p>
+        </section>
+      )}
 
       {esNueva && (
         <p role="status" className="rounded-3xl bg-emerald-50 px-5 py-4 text-center text-base font-semibold text-emerald-900">
@@ -310,6 +358,28 @@ const VistaSala = ({
       )}
 
       <ActividadSala actividad={sala.actividad} desde={sala.desde} />
+
+      {sala.historial.length > 0 && (
+        <details className="rounded-3xl border border-slate-200 bg-white px-5 py-4">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+            <span aria-hidden>🏆 </span>Historial de temporadas
+          </summary>
+          <ol className="mt-3 space-y-2">
+            {sala.historial.map((periodo) => (
+              <li key={periodo.empiezaEn} className="rounded-2xl bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold text-slate-600">
+                  {fechaCompetencia(periodo.empiezaEn)} – {fechaCompetencia(periodo.terminaEn)}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {periodo.campeones.length
+                    ? periodo.campeones.map((campeon) => `${campeon.alias} · ${campeon.puntaje} pts`).join(' / ')
+                    : 'Temporada sin campeón'}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
 
       {!destacarInvitacion && invitacion}
 

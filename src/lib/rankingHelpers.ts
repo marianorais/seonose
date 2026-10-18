@@ -29,6 +29,8 @@ import {
 } from './playerIdentity'
 import { cargarEstadoGuardado } from './quizHelpers'
 import { getTodayKey } from './appHelpers'
+import { obtenerCampeonesMensuales } from './trofeos'
+import type { CampeonMensual } from './trofeos'
 
 export type RankingPeriod = 'diario' | 'mensual' | 'anual'
 
@@ -66,6 +68,9 @@ export interface RankingData {
   rangeLabel: string
   minGames: number
   excludedByMinGames: number
+  campeonesMensuales?: CampeonMensual[]
+  cierreMesActual?: string
+  diasRestantesMes?: number
 }
 
 export interface RankingResult {
@@ -642,6 +647,7 @@ const obtenerTiemposPorSesion = async (sessionIds: number[]) => {
 export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData> => {
   const definition = PERIOD_DEFINITIONS[period]
   const { fromIso, toIso, rangeLabel } = definition.buildRange(obtenerFechaEnArgentina(new Date()))
+  const campeonatoMensual = period === 'mensual' ? await obtenerCampeonesMensuales() : null
 
   // Antes de armar la tabla se intenta recuperar la partida de hoy si quedó
   // guardada sin la identidad actual. Falla en silencio: si no se puede, el
@@ -791,6 +797,13 @@ export const obtenerRanking = async (period: RankingPeriod): Promise<RankingData
     rangeLabel,
     minGames: definition.minGames,
     excludedByMinGames: accumulators.size - qualified.length,
+    ...(campeonatoMensual
+      ? {
+          campeonesMensuales: campeonatoMensual.campeones,
+          cierreMesActual: campeonatoMensual.cierraMesActual,
+          diasRestantesMes: campeonatoMensual.diasRestantes,
+        }
+      : {}),
   }
 }
 

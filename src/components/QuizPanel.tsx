@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { QuestionItem, QuestionSettings } from '../types'
 import ShareModal from './ShareModal'
 import AccesosPostPartida from './AccesosPostPartida'
+import WelcomeModal from './WelcomeModal'
 import { supabase } from '../lib/supabase'
 import { formatearFechaLarga } from '../lib/fechas'
 
@@ -96,6 +97,8 @@ const QuizPanel = ({
     const [secondsLeft, setSecondsLeft] = useState<number>(savedState?.secondsLeft ?? settings?.secondsPerQuestion ?? 30)
     const [answers, setAnswers] = useState<Answer[]>(savedState?.answers ?? [])
     const [finished, setFinished] = useState<boolean>(savedState?.finished ?? false)
+    const [hasStarted, setHasStarted] = useState<boolean>(() => Boolean(savedState))
+    const [welcomeOpen, setWelcomeOpen] = useState<boolean>(() => !savedState)
     const [nextIteration, setNextIteration] = useState<Date>(savedState?.nextIteration ? new Date(savedState.nextIteration) : obtenerSiguienteIteracion())
     const [remainingText, setRemainingText] = useState<string>(formatearTiempoRestante(nextIteration))
 
@@ -104,6 +107,8 @@ const QuizPanel = ({
     const [copiedToast, setCopiedToast] = useState<boolean>(false)
 
     const [questionStartTime, setQuestionStartTime] = useState<number>(() => Date.now())
+    const questionTitleRef = useRef<HTMLHeadingElement>(null)
+    const welcomeTriggerRef = useRef<HTMLButtonElement>(null)
     const [showFeedback, setShowFeedback] = useState<boolean>(savedState?.showFeedback ?? false)
     const [tempAnswer, setTempAnswer] = useState<string>(savedState?.answer ?? '')
     const [isTimeout, setIsTimeout] = useState<boolean>(savedState?.isTimeout ?? false)
@@ -317,14 +322,14 @@ const QuizPanel = ({
     }, [questionDate, settings, resetQuiz])
 
     // Partida en curso = hay preguntas cargadas y todavia no se termino.
-    const partidaActiva = Boolean(settings) && questions.length > 0 && !finished
+    const partidaActiva = hasStarted && Boolean(settings) && questions.length > 0 && !finished
 
     useEffect(() => {
       onPartidaActivaChange?.(partidaActiva)
     }, [partidaActiva, onPartidaActivaChange])
 
     useEffect(() => {
-      if (!settings || finished || !currentQuestion || showFeedback) return
+      if (!hasStarted || !settings || finished || !currentQuestion || showFeedback) return
 
       const timer = window.setTimeout(() => {
         if (secondsLeft <= 0) {
@@ -338,7 +343,17 @@ const QuizPanel = ({
       }, 1000)
 
       return () => window.clearTimeout(timer)
-    }, [secondsLeft, settings, finished, currentQuestion, showFeedback])
+    }, [hasStarted, secondsLeft, settings, finished, currentQuestion, showFeedback])
+
+    useEffect(() => {
+      if (hasStarted && !finished && currentIndex === 0 && answers.length === 0) {
+        questionTitleRef.current?.focus()
+      }
+    }, [hasStarted, finished, currentIndex, answers.length])
+
+    useEffect(() => {
+      if (!welcomeOpen && !hasStarted) welcomeTriggerRef.current?.focus()
+    }, [welcomeOpen, hasStarted])
 
     useEffect(() => {
       const interval = window.setInterval(() => setRemainingText(formatearTiempoRestante(nextIteration)), 1000)
@@ -459,7 +474,18 @@ const QuizPanel = ({
       setShowFeedback(true)
     }
 
-    const handleRetry = () => resetQuiz()
+    const handleStart = () => {
+      setSecondsLeft(settings?.secondsPerQuestion ?? 30)
+      setQuestionStartTime(Date.now())
+      setHasStarted(true)
+    }
+
+    const handleWelcomeClose = useCallback(() => setWelcomeOpen(false), [])
+
+    const handleRetry = () => {
+      resetQuiz()
+      setHasStarted(false)
+    }
 
     // Texto que se comparte: incluye una barra de cuadraditos (🟩 acierto /
     // 🟥 error) en el orden real en que se respondieron las preguntas.
@@ -499,6 +525,44 @@ const QuizPanel = ({
 
     if (!settings || questions.length === 0) {
       return <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-600">Cargando preguntas...</div>
+    }
+
+    if (!hasStarted && !finished) {
+      return (
+        <>
+          {!welcomeOpen && (
+            <div className="mx-auto w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                {esAnterior ? 'Desafío anterior' : allowReplay ? 'Otra partida' : 'Desafío diario'}
+              </p>
+              <p className="mt-2 text-slate-600">Cuando quieras, te contamos cómo jugar.</p>
+              <button
+                ref={welcomeTriggerRef}
+                type="button"
+                onClick={() => setWelcomeOpen(true)}
+                className="mt-5 rounded-2xl bg-[#4959a6] px-6 py-3 font-bold text-white shadow-sm transition hover:bg-[#3f4c8f] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#4959a6]/40"
+              >
+                Ver bienvenida
+              </button>
+            </div>
+          )}
+          {welcomeOpen && (
+            <WelcomeModal
+              challengeLabel={
+                esAnterior
+                  ? `Desafío anterior · ${formatearFechaLarga(questionDate)}`
+                  : allowReplay
+                    ? 'Otra partida'
+                    : 'Desafío diario'
+              }
+              questionsCount={questions.length}
+              secondsPerQuestion={settings.secondsPerQuestion}
+              onStart={handleStart}
+              onClose={handleWelcomeClose}
+            />
+          )}
+        </>
+      )
     }
 
     if (finished) {
@@ -727,7 +791,7 @@ const QuizPanel = ({
         </div>
 
         <div className="quiz-question mx-auto w-full max-w-4xl">
-          <h2 className="font-bold leading-tight text-slate-900 text-center">{currentQuestion?.question}</h2>
+          <h2 ref={questionTitleRef} tabIndex={-1} className="font-bold leading-tight text-slate-900 text-center focus:outline-none">{currentQuestion?.question}</h2>
         </div>
 
         {/*

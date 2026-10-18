@@ -65,6 +65,11 @@ body {
   color: #0f172a;
 }
 
+.welcome-dialog::backdrop {
+  background: rgb(15 23 42 / 55%);
+  backdrop-filter: blur(6px);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -275,4 +280,3 @@ button {
     }
   }
 }
-

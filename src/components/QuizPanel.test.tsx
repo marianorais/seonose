@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -48,6 +48,7 @@ const renderizar = (props: Partial<Parameters<typeof QuizPanel>[0]> = {}) =>
   )
 
 const jugar = async () => {
+  fireEvent.click(screen.getByRole('button', { name: /¡JUGAR AHORA!/ }))
   fireEvent.click(screen.getByRole('button', { name: 'París' }))
   fireEvent.click(screen.getByRole('button', { name: 'Siguiente pregunta' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Venus' }))
@@ -63,6 +64,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -78,6 +80,43 @@ describe('desafío de hoy (sin cambios)', () => {
     expect(insertsSesion[0]).not.toHaveProperty('fecha_desafio')
     expect(screen.getByText(/Nuevo desafío en/)).toBeTruthy()
     expect(screen.getByText('Desafiá a tus amigos')).toBeTruthy()
+  })
+
+  it('muestra la bienvenida antes de la pregunta y recién inicia el reloj al confirmar', async () => {
+    vi.useFakeTimers()
+    renderizar()
+
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'SEoNOSE' })).toBeTruthy()
+    expect(
+      screen.getByText((_, element) => element?.textContent?.replace(/\s+/g, ' ').trim() === '30 s por pregunta')
+    ).toBeTruthy()
+    expect(screen.getByText('De Historia y Geografía a Música, Deportes y mucho más.')).toBeTruthy()
+    expect(screen.queryByText('¿Capital de Francia?')).toBeNull()
+
+    act(() => vi.advanceTimersByTime(5000))
+    fireEvent.click(screen.getByRole('button', { name: /¡JUGAR AHORA!/ }))
+
+    expect(screen.getByText('¿Capital de Francia?')).toBeTruthy()
+    expect(screen.getByRole('timer').textContent).toBe('30')
+    act(() => vi.advanceTimersByTime(1000))
+    expect(screen.getByRole('timer').textContent).toBe('29')
+    vi.useRealTimers()
+  })
+
+  it('permite cerrar la bienvenida con la cruz o el fondo sin empezar la partida', () => {
+    renderizar()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar bienvenida' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByText('¿Capital de Francia?')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver bienvenida' }))
+    expect(screen.getByRole('dialog')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('dialog'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByText('¿Capital de Francia?')).toBeNull()
+    expect(insertsSesion).toHaveLength(0)
   })
 })
 

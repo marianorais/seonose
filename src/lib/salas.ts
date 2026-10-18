@@ -113,12 +113,26 @@ export interface ActividadSala {
   completadaEn: string
 }
 
+export interface CampeonSala {
+  alias: string
+  puntaje: number
+}
+
+export interface PeriodoSala {
+  empiezaEn: string
+  terminaEn: string
+  campeones: CampeonSala[]
+}
+
 export interface DetalleSala {
   codigo: string
   nombre: string
   desde: string
   integrantes: number
   soyPropietario: boolean
+  temporada: { empiezaEn: string; terminaEn: string; diasRestantes: number }
+  cierres: PeriodoSala[]
+  historial: PeriodoSala[]
   hoy: string
   tabla: FilaSala[]
   actividad: ActividadSala[]
@@ -233,6 +247,15 @@ const aActividad = (fila: Record<string, unknown>): ActividadSala => ({
   completadaEn: String(fila.completada_en),
 })
 
+const aPeriodoSala = (fila: Record<string, unknown>): PeriodoSala => ({
+  empiezaEn: String(fila.empieza_en),
+  terminaEn: String(fila.termina_en),
+  campeones: ((fila.campeones as Record<string, unknown>[] | undefined) ?? []).map((campeon) => ({
+    alias: String(campeon.alias ?? 'Jugador'),
+    puntaje: Number(campeon.puntaje),
+  })),
+})
+
 export const obtenerRankingSala = async (codigo: string, playerId: string) =>
   traducir(await llamarRpc<Fila>('ranking_sala', { p_codigo: codigo, p_playerid: playerId }), (fila): DetalleSala => {
     const sala = fila.sala as Record<string, unknown>
@@ -243,6 +266,13 @@ export const obtenerRankingSala = async (codigo: string, playerId: string) =>
       desde: String(sala.desde),
       integrantes: Number(sala.integrantes),
       soyPropietario: Boolean(sala.soy_propietario),
+      temporada: {
+        empiezaEn: String((sala.temporada as Record<string, unknown>).empieza_en),
+        terminaEn: String((sala.temporada as Record<string, unknown>).termina_en),
+        diasRestantes: Number((sala.temporada as Record<string, unknown>).dias_restantes),
+      },
+      cierres: ((fila.cierres as Record<string, unknown>[] | undefined) ?? []).map(aPeriodoSala),
+      historial: ((fila.historial as Record<string, unknown>[] | undefined) ?? []).map(aPeriodoSala),
       hoy: String(fila.hoy),
       tabla: ((fila.tabla as Record<string, unknown>[]) ?? []).map(aFila),
       actividad: ((fila.actividad as Record<string, unknown>[]) ?? []).map(aActividad),

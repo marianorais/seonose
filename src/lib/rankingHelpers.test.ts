@@ -57,7 +57,18 @@ vi.mock('./supabase', () => {
     return cadena
   }
 
-  return { supabase: { from: consulta, rpc: vi.fn(async () => ({ data: null, error: null })) } }
+  return {
+    supabase: {
+      from: consulta,
+      rpc: vi.fn(async (nombre: string) => ({
+        data:
+          nombre === 'cerrar_campeonatos_mensuales'
+            ? { estado: 'ok', cierra_mes_actual: '2026-11-01T03:00:00Z', dias_restantes: 19, campeones: [] }
+            : null,
+        error: null,
+      })),
+    },
+  }
 })
 
 const { obtenerRanking } = await import('./rankingHelpers')
@@ -125,6 +136,8 @@ describe('el período se decide por la fecha del desafío, no por cuándo se jug
     expect(await puntosDe('mensual')).toBe(0) // mínimo de 3 partidas: no califica con 2
     const datos = await obtenerRanking('mensual')
     expect(datos.currentPlayerGames).toBe(2)
+    expect(datos.diasRestantesMes).toBe(19)
+    expect(datos.campeonesMensuales).toEqual([])
     expect(filtros.at(-1)).toEqual(expect.arrayContaining(['fecha_desafio>=2026-10-01', 'fecha_desafio<2026-11-01']))
   })
 

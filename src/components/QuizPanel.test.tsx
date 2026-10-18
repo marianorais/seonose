@@ -104,19 +104,35 @@ describe('desafío de hoy (sin cambios)', () => {
     vi.useRealTimers()
   })
 
-  it('permite cerrar la bienvenida con la cruz o el fondo sin empezar la partida', () => {
+  it('inicia la partida al cerrar la bienvenida con la cruz', () => {
     renderizar()
 
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar bienvenida' }))
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.queryByText('¿Capital de Francia?')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Ver bienvenida' }))
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByText('¿Capital de Francia?')).toBeTruthy()
+    expect(screen.getByRole('timer').textContent).toBe('30')
+    expect(insertsSesion).toHaveLength(0)
+  })
 
+  it('inicia la partida al cerrar la bienvenida haciendo clic fuera del panel', () => {
+    renderizar()
     fireEvent.click(screen.getByRole('dialog'))
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.queryByText('¿Capital de Francia?')).toBeNull()
+    expect(screen.getByText('¿Capital de Francia?')).toBeTruthy()
+    expect(screen.getByRole('timer').textContent).toBe('30')
     expect(insertsSesion).toHaveLength(0)
+  })
+
+  it('evita seleccionar o copiar el texto de la pregunta', () => {
+    renderizar()
+    fireEvent.click(screen.getByRole('button', { name: /¡JUGAR AHORA!/ }))
+
+    const heading = screen.getByRole('heading', { name: '¿Capital de Francia?' })
+    expect(heading.className).toContain('select-none')
+
+    const copyEvent = new Event('copy', { bubbles: true, cancelable: true })
+    heading.dispatchEvent(copyEvent)
+    expect(copyEvent.defaultPrevented).toBe(true)
   })
 })
 

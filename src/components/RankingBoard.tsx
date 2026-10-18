@@ -506,50 +506,6 @@ const PeriodBoard = ({ period, metric }: { period: RankingPeriod; metric: Rankin
         {METRIC_DEFINITIONS[metric].criterio}
         {definition.minGames > 1 && ` Mínimo ${definition.minGames} partidas en el período.`}
       </p>
-
-      {data && period === 'mensual' && data.campeonesMensuales && data.cierreMesActual && (
-        <section className="rounded-3xl border border-amber-200 bg-amber-50 p-4" aria-label="Campeonato mensual global">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">🌟 Copa mensual global</p>
-              <h3 className="mt-1 font-bold text-slate-900">El mes actual está en juego</h3>
-            </div>
-            <p className="rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-amber-950">
-              Cierra en {data.diasRestantesMes ?? 0} {data.diasRestantesMes === 1 ? 'día' : 'días'}
-            </p>
-          </div>
-          <p className="mt-2 text-xs text-slate-600">Se cuenta el ranking del mes calendario en hora argentina. Para clasificar hacen falta al menos 3 partidas.</p>
-
-          {data.campeonesMensuales.length > 0 ? (
-            <div className="mt-4">
-              <h4 className="text-sm font-bold text-amber-950">Campeones mensuales anteriores</h4>
-              <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-                {data.campeonesMensuales.slice(0, 6).map((periodo) => {
-                  const mes = new Intl.DateTimeFormat('es-AR', {
-                    month: 'long',
-                    year: 'numeric',
-                    timeZone: 'UTC',
-                  }).format(new Date(`${periodo.mes}-01T00:00:00Z`))
-                  return (
-                    <li key={periodo.mes} className="rounded-2xl bg-white px-3 py-2.5">
-                      <p className="text-xs font-semibold capitalize text-slate-500">{mes}</p>
-                      <p className="mt-0.5 text-sm font-bold text-slate-900">
-                        {periodo.campeones.length > 0
-                          ? periodo.campeones.map((campeon) => `${campeon.alias} · ${campeon.puntaje} pts`).join(' / ')
-                          : 'Sin campeón: no hubo resultados válidos'}
-                      </p>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          ) : (
-            <p className="mt-3 rounded-2xl bg-white px-3 py-2 text-sm text-slate-700">
-              El primer campeonato global se definirá al cerrar un mes con resultados válidos.
-            </p>
-          )}
-        </section>
-      )}
     </div>
   )
 }

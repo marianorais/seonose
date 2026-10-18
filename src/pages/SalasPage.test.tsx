@@ -61,24 +61,9 @@ const detalle = (tabla: unknown[], extra: Record<string, unknown> = {}) =>
   ok({
     estado: 'ok',
     hoy: '2026-10-11',
-    sala: {
-      codigo: 'abcd2345xy',
-      nombre: 'Oficina',
-      creada_en: '2026-10-09T10:00:00Z',
-      desde: '2026-10-09',
-      integrantes: tabla.length,
-      soy_propietario: false,
-      temporada: {
-        empieza_en: '2026-10-09T03:00:00Z',
-        termina_en: '2026-11-08T03:00:00Z',
-        dias_restantes: 20,
-      },
-      ...extra,
-    },
+    sala: { codigo: 'abcd2345xy', nombre: 'Oficina', creada_en: '2026-10-09T10:00:00Z', desde: '2026-10-09', integrantes: tabla.length, soy_propietario: false, ...extra },
     tabla,
     actividad: [],
-    cierres: [],
-    historial: [],
   })
 
 beforeEach(() => {
@@ -201,8 +186,6 @@ describe('pantalla de la sala', () => {
     renderizar('/sala/abcd2345xy')
 
     expect(await screen.findByText('El ranking arranca con el próximo desafío')).toBeTruthy()
-    expect(screen.getByText('Temporada de 30 días')).toBeTruthy()
-    expect(screen.getByText('Quedan 20 días')).toBeTruthy()
     expect(screen.getByText('Jugá el desafío de hoy y sumá puntos')).toBeTruthy()
   })
 

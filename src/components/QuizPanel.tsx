@@ -474,13 +474,16 @@ const QuizPanel = ({
       setShowFeedback(true)
     }
 
-    const handleStart = () => {
+    const handleStart = useCallback(() => {
       setSecondsLeft(settings?.secondsPerQuestion ?? 30)
       setQuestionStartTime(Date.now())
       setHasStarted(true)
-    }
+    }, [settings])
 
-    const handleWelcomeClose = useCallback(() => setWelcomeOpen(false), [])
+    const handleWelcomeClose = useCallback(() => {
+      setWelcomeOpen(false)
+      handleStart()
+    }, [handleStart])
 
     const handleRetry = () => {
       resetQuiz()
@@ -791,7 +794,14 @@ const QuizPanel = ({
         </div>
 
         <div className="quiz-question mx-auto w-full max-w-4xl">
-          <h2 ref={questionTitleRef} tabIndex={-1} className="font-bold leading-tight text-slate-900 text-center focus:outline-none">{currentQuestion?.question}</h2>
+          <h2
+            ref={questionTitleRef}
+            tabIndex={-1}
+            onCopy={(event) => event.preventDefault()}
+            className="select-none text-center font-bold leading-tight text-slate-900 focus:outline-none"
+          >
+            {currentQuestion?.question}
+          </h2>
         </div>
 
         {/*

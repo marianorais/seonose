@@ -5,10 +5,6 @@ import PaginaBase, { Portada } from '../components/PaginaBase'
 import { AVATAR_PREDEFINIDOS, AVATAR_PREDETERMINADO } from '../lib/avatarConfig'
 import { guardarPerfil, obtenerPerfilDePlayer } from '../lib/aliasHelpers'
 import { obtenerPlayerId } from '../lib/playerIdentity'
-import { obtenerTrofeosJugador } from '../lib/trofeos'
-import type { TrofeoJugador } from '../lib/trofeos'
-import { formatearFechaCorta } from '../lib/fechas'
-import { mensajeDeError } from '../lib/rpc'
 
 const MENSAJES_ERROR: Record<string, string> = {
   'alias-invalido': 'El alias debe tener entre 1 y 30 caracteres.',
@@ -27,10 +23,6 @@ function PerfilPage() {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState(false)
-  const [trofeos, setTrofeos] = useState<TrofeoJugador[]>([])
-  const [estadoTrofeos, setEstadoTrofeos] = useState<'cargando' | 'listo' | 'error'>('cargando')
-  const [errorTrofeos, setErrorTrofeos] = useState<string | null>(null)
-  const [intentoTrofeos, setIntentoTrofeos] = useState(0)
 
   useEffect(() => {
     let vigente = true
@@ -60,33 +52,6 @@ function PerfilPage() {
       vigente = false
     }
   }, [intentoCarga, playerId])
-
-  useEffect(() => {
-    let vigente = true
-
-    void obtenerTrofeosJugador(playerId)
-      .then((respuesta) => {
-        if (!vigente) return
-        if (!respuesta.ok) {
-          setErrorTrofeos(mensajeDeError(respuesta.error))
-          setEstadoTrofeos('error')
-          return
-        }
-        setTrofeos(respuesta.datos)
-        setEstadoTrofeos('listo')
-      })
-      .catch((exception: unknown) => {
-        console.error('No se pudo cargar el palmarés:', exception)
-        if (vigente) {
-          setErrorTrofeos('No pudimos cargar tus trofeos. Probá de nuevo en un momento.')
-          setEstadoTrofeos('error')
-        }
-      })
-
-    return () => {
-      vigente = false
-    }
-  }, [intentoTrofeos, playerId])
 
   const guardar = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -219,77 +184,6 @@ function PerfilPage() {
                 {guardando ? 'Guardando…' : 'Guardar cambios'}
               </button>
             </form>
-          )}
-        </section>
-
-        <section className="card-surface space-y-4" aria-labelledby="titulo-palmares">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-700">Tus victorias</p>
-            <h2 id="titulo-palmares" className="mt-1 text-xl font-bold text-slate-900">Palmarés</h2>
-          </div>
-
-          {estadoTrofeos === 'cargando' ? (
-            <p role="status" className="py-4 text-center text-sm text-slate-600">Cargando tus trofeos…</p>
-          ) : estadoTrofeos === 'error' ? (
-            <div className="space-y-3 text-center">
-              <p role="alert" className="text-sm font-semibold text-red-700">{errorTrofeos}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setEstadoTrofeos('cargando')
-                  setErrorTrofeos(null)
-                  setIntentoTrofeos((intento) => intento + 1)
-                }}
-                className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Reintentar
-              </button>
-            </div>
-          ) : trofeos.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-amber-300 bg-amber-50 px-5 py-6 text-center">
-              <p className="text-3xl" aria-hidden>🏆</p>
-              <p className="mt-2 font-bold text-slate-900">Todavía no hay trofeos</p>
-              <p className="mt-1 text-sm text-slate-600">Sumate a una sala o al ranking mensual. Cada competencia es una nueva oportunidad.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-3xl border border-sky-200 bg-sky-50 p-4">
-                <h3 className="font-bold text-sky-950">🏆 Copas de sala</h3>
-                {trofeos.filter((trofeo) => trofeo.tipo === 'sala').length > 0 ? (
-                  <ul className="mt-3 space-y-2">
-                    {trofeos.filter((trofeo) => trofeo.tipo === 'sala').map((trofeo) => (
-                      <li key={`${trofeo.salaId}-${trofeo.empiezaEn}`} className="rounded-2xl bg-white p-3">
-                        <p className="font-semibold text-slate-900">{trofeo.salaNombre ?? 'Sala'}</p>
-                        <p className="mt-1 text-xs text-slate-600">
-                          {formatearFechaCorta(trofeo.empiezaEn.slice(0, 10))} – {formatearFechaCorta(trofeo.terminaEn.slice(0, 10))}
-                          {' · '}{trofeo.puntaje} {trofeo.puntaje === 1 ? 'punto' : 'puntos'}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : <p className="mt-2 text-sm text-slate-600">Todavía no ganaste copas de sala.</p>}
-              </div>
-
-              <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
-                <h3 className="font-bold text-amber-950">🌟 Copas mensuales globales</h3>
-                {trofeos.filter((trofeo) => trofeo.tipo === 'mensual').length > 0 ? (
-                  <ul className="mt-3 space-y-2">
-                    {trofeos.filter((trofeo) => trofeo.tipo === 'mensual').map((trofeo) => {
-                      const mes = trofeo.mes ? new Date(`${trofeo.mes}-01T00:00:00Z`) : new Date(trofeo.empiezaEn)
-                      const mesEtiqueta = new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(mes)
-                      return (
-                        <li key={`${trofeo.mes}-${trofeo.empiezaEn}`} className="rounded-2xl bg-white p-3">
-                          <p className="font-semibold capitalize text-slate-900">{mesEtiqueta}</p>
-                          <p className="mt-1 text-xs text-slate-600">
-                            Campeón mensual global · {trofeo.puntaje} {trofeo.puntaje === 1 ? 'punto' : 'puntos'}
-                          </p>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                ) : <p className="mt-2 text-sm text-slate-600">Todavía no ganaste copas mensuales.</p>}
-              </div>
-            </div>
           )}
         </section>
       </div>

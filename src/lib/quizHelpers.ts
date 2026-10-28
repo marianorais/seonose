@@ -116,7 +116,7 @@ export const tieneHistorialLocal = () => {
   }
 }
 
-export const guardarResultadoEnHistorial = (answers: { isCorrect: boolean }[]) => {
+export const guardarResultadoEnHistorial = (answers: { isCorrect: boolean }[], esAnterior = false) => {
   try {
     const correctCount = answers.filter((a) => a.isCorrect).length
 
@@ -125,6 +125,8 @@ export const guardarResultadoEnHistorial = (answers: { isCorrect: boolean }[]) =
       total: answers.length,
       correct: correctCount,
       percentage: Math.round((correctCount / answers.length) * 100),
+      // Un desafío anterior jugado hoy no cuenta para la racha de días seguidos.
+      ...(esAnterior ? { anterior: true } : {}),
     }
 
     const history = JSON.parse(window.localStorage.getItem(CLAVE_HISTORIAL_RESULTADOS) ?? '[]')
@@ -134,5 +136,44 @@ export const guardarResultadoEnHistorial = (answers: { isCorrect: boolean }[]) =
     window.localStorage.setItem(CLAVE_HISTORIAL_RESULTADOS, JSON.stringify(history))
   } catch {
     // Ignore storage errors
+  }
+}
+
+/**
+ * Días seguidos con el desafío diario terminado en este dispositivo, contando
+ * hasta hoy (o hasta ayer, si hoy todavía no jugó: la racha sigue viva).
+ *
+ * Sale del historial local, así que no necesita red ni cuenta. Los días son los
+ * de Argentina, igual que el desafío.
+ */
+export const calcularRacha = (hoy: string = getTodayKey()): number => {
+  try {
+    const historial = JSON.parse(window.localStorage.getItem(CLAVE_HISTORIAL_RESULTADOS) ?? '[]') as {
+      date?: string
+      anterior?: boolean
+    }[]
+
+    const formato = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+    const dias = new Set(
+      historial.filter((r) => r.date && !r.anterior).map((r) => formato.format(new Date(r.date as string)))
+    )
+
+    const diaAnterior = (dia: string) => {
+      const fecha = new Date(`${dia}T12:00:00Z`)
+      fecha.setUTCDate(fecha.getUTCDate() - 1)
+      return fecha.toISOString().slice(0, 10)
+    }
+
+    let dia = dias.has(hoy) ? hoy : diaAnterior(hoy)
+    let racha = 0
+
+    while (dias.has(dia)) {
+      racha++
+      dia = diaAnterior(dia)
+    }
+
+    return racha
+  } catch {
+    return 0
   }
 }

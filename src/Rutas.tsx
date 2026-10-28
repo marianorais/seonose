@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Routes, Route } from 'react-router-dom'
 
 import App from './App.tsx'
+import CanonicalRuta from './components/CanonicalRuta.tsx'
 import EstadisticasPage from './pages/EstadisticasPage.tsx'
 import ContactoPage from './pages/ContactoPage.tsx'
 import RankingPage from './pages/RankingPage.tsx'
@@ -27,6 +28,7 @@ const Cargando = () => (
 
 const Rutas = () => (
   <Suspense fallback={<Cargando />}>
+    <CanonicalRuta />
     <Routes>
       <Route path="/" element={<App />} />
       <Route path="/repetir" element={<App />} />

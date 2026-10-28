@@ -27,6 +27,17 @@ vi.mock('../lib/supabase', () => ({
   },
 }))
 
+// Analítica real (links, nombres de eventos) pero con el envío espiado.
+const eventos: { nombre: string; parametros?: Record<string, unknown> }[] = []
+
+vi.mock('../lib/analytics', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../lib/analytics')>()
+  return {
+    ...real,
+    registrarEvento: (nombre: string, parametros?: Record<string, unknown>) => eventos.push({ nombre, parametros }),
+  }
+})
+
 const { default: QuizPanel } = await import('./QuizPanel')
 
 const preguntas: QuestionItem[] = [
@@ -56,6 +67,7 @@ const jugar = async () => {
 }
 
 beforeEach(() => {
+  eventos.length = 0
   insertsSesion.length = 0
   errorSesion = null
   window.localStorage.clear()
@@ -80,6 +92,44 @@ describe('desafío de hoy (sin cambios)', () => {
     expect(insertsSesion[0]).not.toHaveProperty('fecha_desafio')
     expect(screen.getByText(/Nuevo desafío en/)).toBeTruthy()
     expect(screen.getByText('Desafiá a tus amigos')).toBeTruthy()
+  })
+
+  it('mide inicio y final una sola vez, sin respuestas en los parámetros', async () => {
+    renderizar()
+    await jugar()
+    await screen.findByText('1 de 2 correctas')
+
+    expect(eventos.filter((e) => e.nombre === 'game_start')).toEqual([{ nombre: 'game_start', parametros: { tipo: 'diario' } }])
+    expect(eventos.filter((e) => e.nombre === 'game_complete')).toEqual([
+      { nombre: 'game_complete', parametros: { tipo: 'diario', aciertos: 1, total: 2 } },
+    ])
+    expect(JSON.stringify(eventos)).not.toMatch(/París|Venus|Marte/)
+  })
+
+  it('al terminar muestra la racha y comparte un reto sin revelar respuestas', async () => {
+    const copiado: string[] = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (texto: string) => void copiado.push(texto) },
+    })
+
+    renderizar()
+    await jugar()
+    await screen.findByText('1 de 2 correctas')
+
+    expect(screen.getByText(/Volvé mañana y empezá tu racha/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar resultado' }))
+    expect(await screen.findByText('Texto copiado')).toBeTruthy()
+
+    expect(copiado).toHaveLength(1)
+    expect(copiado[0]).toContain('1/2')
+    expect(copiado[0]).toContain('¿Podés superarme?')
+    expect(copiado[0]).toContain('?c=cp')
+    expect(copiado[0]).not.toMatch(/París|Venus|Marte/)
+    expect(eventos.filter((e) => e.nombre === 'share_click')).toEqual([
+      { nombre: 'share_click', parametros: { canal: 'copiar', tipo: 'diario' } },
+    ])
   })
 
   it('muestra la bienvenida antes de la pregunta y recién inicia el reloj al confirmar', async () => {

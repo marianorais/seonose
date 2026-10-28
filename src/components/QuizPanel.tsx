@@ -26,6 +26,9 @@ import {
   guardarResultadoEnHistorial,
 } from '../lib/quizHelpers'
 import { getCategoryMeta } from '../lib/categoryHelpers'
+import { calcularRacha } from '../lib/quizHelpers'
+import { EVENTOS, registrarEvento, type CanalCompartir } from '../lib/analytics'
+import { compartirNativo, copiarTexto, puedeCompartirNativo, textoResultado } from '../lib/compartir'
 
 type SavedQuizState = {
   currentIndex?: number
@@ -103,8 +106,10 @@ const QuizPanel = ({
     const [remainingText, setRemainingText] = useState<string>(formatearTiempoRestante(nextIteration))
 
     const [shareOpen, setShareOpen] = useState<boolean>(false)
-    const [shareText, setShareText] = useState<string>('')
     const [copiedToast, setCopiedToast] = useState<boolean>(false)
+
+    /** Para la analítica: qué clase de partida es, sin datos del jugador. */
+    const tipoPartida = esAnterior ? 'anterior' : allowReplay ? 'repetir' : 'diario'
 
     const [questionStartTime, setQuestionStartTime] = useState<number>(() => Date.now())
     const questionTitleRef = useRef<HTMLHeadingElement>(null)
@@ -286,7 +291,6 @@ const QuizPanel = ({
       setShowFeedback(false)
       setIsTimeout(false)
       setShareOpen(false)
-      setShareText('')
       setNextIteration(obtenerSiguienteIteracion())
       setQuestionStartTime(Date.now())
       finishRecordedRef.current = false
@@ -302,7 +306,6 @@ const QuizPanel = ({
       setShowFeedback,
       setIsTimeout,
       setShareOpen,
-      setShareText,
       setNextIteration,
       setQuestionStartTime,
     ])
@@ -323,6 +326,10 @@ const QuizPanel = ({
 
     // Partida en curso = hay preguntas cargadas y todavia no se termino.
     const partidaActiva = hasStarted && Boolean(settings) && questions.length > 0 && !finished
+
+    // Se calcula al terminar (el historial ya incluye la partida de hoy) y no en
+    // cada segundo de la cuenta regresiva.
+    const racha = useMemo(() => (finished && !esAnterior ? calcularRacha() : 0), [finished, esAnterior])
 
     useEffect(() => {
       onPartidaActivaChange?.(partidaActiva)
@@ -453,7 +460,12 @@ const QuizPanel = ({
         // respuestas duplicadas en la base.
         if (!finishRecordedRef.current) {
           finishRecordedRef.current = true
-          guardarResultadoEnHistorial(nextAnswers)
+          guardarResultadoEnHistorial(nextAnswers, esAnterior)
+          registrarEvento(EVENTOS.partidaTerminada, {
+            tipo: tipoPartida,
+            aciertos: nextAnswers.filter((a) => a.isCorrect).length,
+            total: nextAnswers.length,
+          })
           await saveCompletedGame(nextAnswers)
         }
         setFinished(true)
@@ -478,7 +490,8 @@ const QuizPanel = ({
       setSecondsLeft(settings?.secondsPerQuestion ?? 30)
       setQuestionStartTime(Date.now())
       setHasStarted(true)
-    }, [settings])
+      registrarEvento(EVENTOS.partidaIniciada, { tipo: tipoPartida })
+    }, [settings, tipoPartida])
 
     const handleWelcomeClose = useCallback(() => {
       setWelcomeOpen(false)
@@ -491,22 +504,31 @@ const QuizPanel = ({
     }
 
     // Texto que se comparte: incluye una barra de cuadraditos (🟩 acierto /
-    // 🟥 error) en el orden real en que se respondieron las preguntas.
-    const construirTextoResultado = () => {
-      const correctCount = answers.filter((a) => a.isCorrect).length
-      const total = answers.length
-      const barra = answers.map((a) => (a.isCorrect ? '🟩' : '🟥')).join('')
+    // 🟥 error) en el orden real en que se respondieron las preguntas. El link
+    // va marcado con el canal para saber cuántos llegan por cada uno.
+    const textoPara = (canal: CanalCompartir) =>
+      textoResultado(
+        {
+          numero: gameNumber,
+          aciertos: answers.map((a) => a.isCorrect),
+          fechaAnterior: esAnterior ? questionDate : undefined,
+        },
+        canal
+      )
 
-      return [
-        `🧠 Se o No Se #${gameNumber} ${correctCount}/${total}`,
-        barra,
-        ...(esAnterior ? [`📅 Desafío del ${formatearFechaLarga(questionDate)}`] : []),
-        `👉 ${window.location.origin}`,
-      ].join('\n')
-    }
+    const registrarCompartido = (canal: CanalCompartir) =>
+      registrarEvento(EVENTOS.compartido, { canal, tipo: tipoPartida })
 
-    const handleShareOpen = () => {
-      setShareText(construirTextoResultado())
+    // En el celular, la hoja de compartir del sistema es lo más directo (llega a
+    // WhatsApp, Instagram, etc. en un toque). En la compu, el menú propio.
+    const handleShareOpen = async () => {
+      const esTactil = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+
+      if (esTactil && puedeCompartirNativo()) {
+        registrarCompartido('nativo')
+        if (await compartirNativo(textoPara('nativo'))) return
+      }
+
       setShareOpen(true)
     }
 
@@ -572,78 +594,96 @@ const QuizPanel = ({
       const correctCount = answers.filter((a) => a.isCorrect).length
       const totalResponseTime = answers.reduce((sum, a) => sum + a.responseTime, 0)
       const averageResponseTime = answers.length > 0 ? Math.round(totalResponseTime / answers.length) : 0
-      const shareSummary = construirTextoResultado()
 
-      const copyToClipboard = async (text: string) => {
-        try {
-          await navigator.clipboard.writeText(text)
+      const copyToClipboard = async () => {
+        registrarCompartido('copiar')
+        if (await copiarTexto(textoPara('copiar'))) {
           setCopiedToast(true)
           window.setTimeout(() => setCopiedToast(false), 2000)
-        } catch (e) {
-          console.error('No se pudo copiar', e)
+        } else {
+          setShareOpen(true)
         }
       }
 
-      const shareViaWhatsApp = (text: string) => {
-        const encoded = encodeURIComponent(text)
-        const href = `https://wa.me/?text=${encoded}`
-        window.open(href, '_blank')
+      const shareViaWhatsApp = () => {
+        registrarCompartido('whatsapp')
+        window.open(`https://wa.me/?text=${encodeURIComponent(textoPara('whatsapp'))}`, '_blank')
       }
 
       return (
         <>
           <div className="w-full space-y-8">
             <div className="flex flex-col gap-4 rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:flex-row sm:items-end sm:justify-between">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">
-                    {esAnterior ? `Desafío #${gameNumber} · ${formatearFechaLarga(questionDate)}` : "Resultados"}
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">
+                  {esAnterior ? `Desafío #${gameNumber} · ${formatearFechaLarga(questionDate)}` : `Desafío #${gameNumber}`}
+                </p>
+                <h2 className="mt-3 text-3xl font-bold text-gray-900">{correctCount} de {answers.length} correctas</h2>
+                <p className="mt-2 text-lg tracking-wide" aria-label={`${correctCount} de ${answers.length} correctas`}>
+                  {answers.map((a, index) => (
+                    <span key={index}>{a.isCorrect ? '🟩' : '🟥'}</span>
+                  ))}
+                </p>
+                <p className="mt-1 text-sm text-gray-600">Tiempo promedio por respuesta: {averageResponseTime} s</p>
+                {/*
+                  Racha: el motivo más simple para volver mañana. Sale del
+                  historial local, no necesita cuenta.
+                */}
+                {!esAnterior && (
+                  <p className="mt-3 text-base font-semibold text-gray-900">
+                    {racha >= 2 ? (
+                      <>
+                        <span aria-hidden>🔥</span> {racha} días seguidos. Volvé mañana para no cortar la racha.
+                      </>
+                    ) : (
+                      <>
+                        <span aria-hidden>🔥</span> Volvé mañana y empezá tu racha.
+                      </>
+                    )}
                   </p>
-                  <h2 className="mt-3 text-3xl font-bold text-gray-900">{correctCount} de {answers.length} correctas</h2>
-                  <p className="mt-2 text-lg tracking-wide" aria-label={`${correctCount} de ${answers.length} correctas`}>
-                    {answers.map((a, index) => (
-                      <span key={index}>{a.isCorrect ? '🟩' : '🟥'}</span>
-                    ))}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-600">Tiempo promedio por respuesta: {averageResponseTime} s</p>
-                </div>
-
-                <div className="mt-2 flex flex-nowrap items-center gap-2">
-                  <button
-                    id="btnTresPuntos"
-                    type="button"
-                    aria-label="Compartir resultado"
-                    onClick={() => {
-                      setShareText(shareSummary)
-                      setShareOpen(true)
-                    }}
-                    className="inline-flex h-10 items-center justify-center rounded-full bg-[#25D366] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1fb15b]"
-                    title="Compartir resultado"
-                  >
-                    Compartir
-                  </button>
-
-                  <button type="button" aria-label="Compartir por WhatsApp" onClick={() => shareViaWhatsApp(shareSummary)} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm" title="Compartir por WhatsApp">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                      <path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.867-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.247-.694.247-1.289.173-1.413z"/>
-                    </svg>
-                  </button>
-
-                  <button type="button" aria-label="Copiar resultado" onClick={() => copyToClipboard(shareSummary)} className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm" title="Copiar resultado">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                      <path d="M16 1H4a2 2 0 00-2 2v12h2V3h12V1z" fill="#111827"/>
-                      <path d="M20 5H8a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2zm0 16H8V7h12v14z" fill="#111827"/>
-                    </svg>
-                  </button>
-                </div>
+                )}
               </div>
 
-                {!esAnterior && (
-                  <div className="flex min-w-[180px] flex-col justify-center rounded-3xl bg-gray-900 px-5 py-4 text-right text-white sm:text-left">
-                    <p className="text-xs uppercase tracking-widest text-slate-300">🔥 Nuevo desafío en</p>
-                    <p className="mt-2 text-4xl font-bold">{remainingText}</p>
-                  </div>
-                )}
+              {!esAnterior && (
+                <div className="flex min-w-[180px] flex-col justify-center rounded-3xl bg-gray-900 px-5 py-4 text-right text-white sm:text-left">
+                  <p className="text-xs uppercase tracking-widest text-slate-300">⏳ Nuevo desafío en</p>
+                  <p className="mt-2 text-4xl font-bold">{remainingText}</p>
+                  <p className="mt-1 text-xs text-slate-300">{questions.length} preguntas nuevas cada día</p>
+                </div>
+              )}
+            </div>
+
+            {/*
+              Compartir, justo debajo del puntaje y antes que todo lo demás: es
+              el momento de mayor interés y la principal forma en que llegan
+              jugadores nuevos. El texto no revela respuestas.
+            */}
+            <div className="rounded-3xl bg-[#4959a6] p-5 text-white shadow-sm">
+              <p className="text-lg font-bold">¿Alguien te supera?</p>
+              <p className="mt-1 text-sm text-white/80">Mandale tu resultado a un amigo. No incluye las respuestas.</p>
+              <div className="mt-4 flex items-center gap-2">
+                <button
+                  id="btnTresPuntos"
+                  type="button"
+                  onClick={handleShareOpen}
+                  className="min-h-12 flex-1 rounded-2xl bg-white px-4 py-3 text-base font-bold text-[#4959a6] shadow-sm transition hover:bg-slate-100"
+                >
+                  Compartir resultado
+                </button>
+
+                <button type="button" aria-label="Compartir por WhatsApp" onClick={shareViaWhatsApp} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#25D366] text-white shadow-sm" title="Compartir por WhatsApp">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                    <path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.867-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.247-.694.247-1.289.173-1.413z"/>
+                  </svg>
+                </button>
+
+                <button type="button" aria-label="Copiar resultado" onClick={copyToClipboard} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm" title="Copiar resultado">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                    <path d="M16 1H4a2 2 0 00-2 2v12h2V3h12V1z" fill="#111827"/>
+                    <path d="M20 5H8a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2zm0 16H8V7h12v14z" fill="#111827"/>
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/*
@@ -748,7 +788,12 @@ const QuizPanel = ({
             </div>
           </div>
 
-          <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} shareText={shareText} />
+          <ShareModal
+            isOpen={shareOpen}
+            onClose={() => setShareOpen(false)}
+            textoPara={textoPara}
+            onCompartir={registrarCompartido}
+          />
 
           {copiedToast && (
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-full bg-slate-900 px-4 py-2 text-sm text-white shadow">Texto copiado</div>

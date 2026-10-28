@@ -42,6 +42,14 @@
   <title>SeoNoSe | Trivia diaria de cultura general</title>
 
   <meta name="description" content="Respondé un desafío nuevo todos los días con preguntas de historia, ciencia, geografía, deportes y cultura general." />
+
+  <!--
+    Dominio canónico: siempre con www (el apex redirige acá). Las URLs con
+    otros parámetros (?c=wa de los links compartidos, etc.) consolidan en esta.
+    Las demás rutas lo actualizan desde `CanonicalRuta`.
+  -->
+  <link rel="canonical" href="https://www.seonose.com.ar/" />
+
   <!-- Open Graph -->
   <meta
     property="og:title"
@@ -53,30 +61,59 @@
     content="Nuevas preguntas todos los días. ¿Cuántas podés acertar?"
   />
 
+  <!-- Con www: el apex responde con una redirección y algunos lectores de previews no la siguen. -->
   <meta
     property="og:image"
-    content="https://seonose.com.ar/logo.jpg"
+    content="https://www.seonose.com.ar/logo.jpg"
   />
 
   <meta
     property="og:image:width"
-    content="1200"
+    content="1280"
   />
 
   <meta
     property="og:image:height"
-    content="630"
+    content="698"
+  />
+
+  <meta
+    property="og:image:type"
+    content="image/jpeg"
   />
 
   <meta
     property="og:url"
-    content="https://seonose.com.ar"
+    content="https://www.seonose.com.ar/"
   />
 
   <meta
     property="og:type"
     content="website"
   />
+
+  <meta
+    property="og:site_name"
+    content="Se o NoSe"
+  />
+
+  <meta
+    property="og:locale"
+    content="es_AR"
+  />
+
+  <!-- Datos estructurados: le dicen a Google qué es el sitio y cómo se llama. -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Se o NoSe",
+      "alternateName": ["SEoNOSE", "SeoNoSe"],
+      "url": "https://www.seonose.com.ar/",
+      "inLanguage": "es-AR",
+      "description": "Trivia diaria de cultura general: un desafío nuevo de preguntas todos los días."
+    }
+  </script>
 
   <!-- Twitter / X -->
   <meta
@@ -96,7 +133,7 @@
 
   <meta
     name="twitter:image"
-    content="https://seonose.com.ar/logo.jpg"
+    content="https://www.seonose.com.ar/logo.jpg"
   />
 </head>
 

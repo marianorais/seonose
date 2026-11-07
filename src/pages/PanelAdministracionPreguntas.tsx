@@ -87,7 +87,7 @@ function AdminPreguntasPage() {
     })
 
   const settings: QuestionSettings = {
-    questionsPerDay: 5,
+    questionsPerDay: 8,
     secondsPerQuestion: 30,
   }
 

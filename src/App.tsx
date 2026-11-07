@@ -13,7 +13,7 @@ import type { ThemeConfig } from './lib/themeConfig'
 type VisualTheme = 'light' | 'dark' | 'black' | 'blue' | 'sepia'
 
 const FALLBACK_SETTINGS: QuestionSettings = {
-  questionsPerDay: 5,
+  questionsPerDay: 8,
   secondsPerQuestion: 30,
 }
 

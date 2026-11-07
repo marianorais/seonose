@@ -15,7 +15,7 @@ function GameSettingsPage () {
     useState(false)
 
   const [questionsPerGame, setQuestionsPerGame] =
-    useState(5)
+    useState(8)
 
   const [secondsPerQuestion, setSecondsPerQuestion] =
     useState(30)

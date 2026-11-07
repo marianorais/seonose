@@ -61,7 +61,7 @@ const FALLBACK_QUESTIONS: QuestionItem[] = [
 
 // const QUESTIONS_PER_GAME = 5
 
-import { getTodayKey, loadCustomSettings, selectDailyQuestions } from './lib/appHelpers'
+import { getTodayKey, selectDailyQuestions } from './lib/appHelpers'
 
 function App() {
   // Durante una pregunta el layout pasa a alto fijo para que todo entre sin
@@ -114,7 +114,7 @@ function App() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        let finalSettings = loadCustomSettings()
+        let finalSettings = FALLBACK_SETTINGS
 
         if (use_database) {
           const { data, error } = await supabase
@@ -185,9 +185,10 @@ function App() {
             const { data: gameSettings, error: settingsError } =
               await supabase
                 .from('game_settings')
-                .select('*')
-                .single()
-            const customSettings = loadCustomSettings()
+                .select('id, questionspergame, secondsperquestion, backgroundcolor, fontfamily')
+                .order('id', { ascending: true })
+                .limit(1)
+                .maybeSingle()
 
             if (settingsError) {
               console.warn('No se pudo leer game_settings de Supabase, usando valores locales:', settingsError)
@@ -197,12 +198,12 @@ function App() {
 
             finalSettings = {
               questionsPerDay:
-                gameSettings?.questionspergame ?? customSettings.questionsPerDay ?? FALLBACK_SETTINGS.questionsPerDay,
+                gameSettings?.questionspergame ?? FALLBACK_SETTINGS.questionsPerDay,
 
               secondsPerQuestion:
-                gameSettings?.secondsperquestion  ?? customSettings.secondsPerQuestion ?? FALLBACK_SETTINGS.secondsPerQuestion,
+                gameSettings?.secondsperquestion ?? FALLBACK_SETTINGS.secondsPerQuestion,
             }
-            console.log('GAME SETTINGS FROM SUPABASE:', gameSettings ?? 'No game settings found, using custom/local settings')
+            console.log('GAME SETTINGS FROM SUPABASE:', gameSettings ?? 'No game settings found, using fallback settings')
             const todayKey = getTodayKey()
 
             const enabledQuestions: QuestionItem[] = questionsData
@@ -270,8 +271,8 @@ function App() {
       } catch (exception) {
         console.error(exception)
 
-        // Si algo falla, usa local
-        const finalSettings = loadCustomSettings()
+        // Si algo falla, usa preguntas de demo y configuración predeterminada.
+        const finalSettings = FALLBACK_SETTINGS
         const todayKey = getTodayKey()
 
         setSettings(finalSettings)

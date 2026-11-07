@@ -8,9 +8,27 @@ import type { QuestionItem, QuestionSettings, GameSettings } from './types'
 import { supabase } from './lib/supabase'
 import { loadThemeConfig } from './lib/themeConfig'
 import type { ThemeConfig } from './lib/themeConfig'
+import { cargarTodasLasPaginas } from './lib/paginarResultados'
 
 
 type VisualTheme = 'light' | 'dark' | 'black' | 'blue' | 'sepia'
+
+type SupabaseQuestion = {
+  id: number
+  question: string
+  answer: string
+  choices: string[] | null
+  availablefrom?: string
+  enabled?: boolean
+  repeatable?: boolean
+  categoryId?: number | null
+  categoryid?: number | null
+  category_id?: number | null
+  categoryName?: string | null
+  categoryname?: string | null
+  categoryIcon?: string | null
+  categoryicon?: string | null
+}
 
 const FALLBACK_SETTINGS: QuestionSettings = {
   questionsPerDay: 8,
@@ -117,32 +135,23 @@ function App() {
         let finalSettings = FALLBACK_SETTINGS
 
         if (use_database) {
-          const { data, error } = await supabase
-            .from('questions')
-            .select('*')
+          const data = await cargarTodasLasPaginas<SupabaseQuestion>(
+            async (from, to) => {
+              const { data: page, error } = await supabase
+                .from('questions')
+                .select('*')
+                .order('id', { ascending: true })
+                .range(from, to)
 
-          if (!error && data && data.length > 0) {
+              return { data: page, error }
+            }
+          )
+
+          if (data.length > 0) {
             type SupabaseCategory = {
               id: number
               name?: string | null
               icon?: string | null
-            }
-
-            type SupabaseQuestion = {
-              id: number
-              question: string
-              answer: string
-              choices: string[] | null
-              availablefrom?: string
-              enabled?: boolean
-              repeatable?: boolean
-              categoryId?: number | null
-              categoryid?: number | null
-              category_id?: number | null
-              categoryName?: string | null
-              categoryname?: string | null
-              categoryIcon?: string | null
-              categoryicon?: string | null
             }
 
             const { data: categoriesData, error: categoriesError } = await supabase
@@ -249,7 +258,7 @@ function App() {
             return
           }
 
-          console.error('Error cargando Supabase:', error)
+          console.warn('Supabase no devolvió preguntas; usando preguntas locales de demo.')
         }
 
         // Fallback local

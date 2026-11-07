@@ -15,6 +15,7 @@ import type { QuestionSettings } from '../types'
 
 import { supabase } from '../lib/supabase'
 import { getCategoryMeta, QUESTION_CATEGORY_OPTIONS } from '../lib/categoryHelpers'
+import { cargarTodasLasPaginas } from '../lib/paginarResultados'
 
 type VisualTheme =
   | 'light'
@@ -146,24 +147,28 @@ function AdminPreguntasPage() {
 
   const loadQuestions =
     async () => {
-      const { data, error } =
-        await supabase
-          .from('questions')
-          .select('*')
-          .order(
-            'availablefrom',
-            {
-              ascending: false,
-            }
-          )
+      let data: QuestionAdminItem[]
 
-      if (error) {
-        console.error(error)
+      try {
+        data = await cargarTodasLasPaginas<QuestionAdminItem>(
+          async (from, to) => {
+            const { data: page, error } = await supabase
+              .from('questions')
+              .select('*')
+              .order('availablefrom', { ascending: false })
+              .order('id', { ascending: true })
+              .range(from, to)
+
+            return { data: page, error }
+          }
+        )
+      } catch (error) {
+        console.error('Error cargando preguntas:', error)
         return
       }
 
       const mappedQuestions =
-        (data ?? []).map(
+        data.map(
           (item: {
             id: number
             question: string

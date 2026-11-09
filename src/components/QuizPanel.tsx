@@ -102,6 +102,8 @@ const QuizPanel = ({
     const [finished, setFinished] = useState<boolean>(savedState?.finished ?? false)
     const [hasStarted, setHasStarted] = useState<boolean>(() => Boolean(savedState))
     const [welcomeOpen, setWelcomeOpen] = useState<boolean>(() => !savedState)
+    /** Día de la partida que está en memoria (puede quedar atrás de `questionDate` durante un render). */
+    const [diaPartida, setDiaPartida] = useState<string>(questionDate)
     const [nextIteration, setNextIteration] = useState<Date>(savedState?.nextIteration ? new Date(savedState.nextIteration) : obtenerSiguienteIteracion())
     const [remainingText, setRemainingText] = useState<string>(formatearTiempoRestante(nextIteration))
 
@@ -321,6 +323,7 @@ const QuizPanel = ({
       if (previousQuestionDateRef.current !== questionDate) {
         previousQuestionDateRef.current = questionDate
         resetQuiz()
+        setDiaPartida(questionDate)
       }
     }, [questionDate, settings, resetQuiz])
 
@@ -373,6 +376,12 @@ const QuizPanel = ({
     }, [currentIndex])
 
     useEffect(() => {
+      // Pasó la medianoche con la pestaña abierta: en este render todavía está
+      // la partida de ayer, que se resetea en el próximo. Guardarla ahora con
+      // la fecha de hoy la haría pasar por la partida de hoy al recargar
+      // (resultado viejo, contador en 00:00:00 y sin poder jugar).
+      if (diaPartida !== questionDate) return
+
       const snapshot: SavedQuizState = {
         currentIndex,
         secondsLeft,
@@ -381,7 +390,7 @@ const QuizPanel = ({
         finished,
         nextIteration: nextIteration.toISOString(),
         gameNumber,
-        dayKey: questionDate,
+        dayKey: diaPartida,
         showFeedback,
         isTimeout,
       }
@@ -404,7 +413,7 @@ const QuizPanel = ({
 
       latestSnapshotRef.current = snapshot
       guardarEstadoQuiz(snapshot, claveEstado)
-    }, [currentIndex, secondsLeft, answers, finished, nextIteration, gameNumber, questionDate, showFeedback, tempAnswer, isTimeout, claveEstado])
+    }, [currentIndex, secondsLeft, answers, finished, nextIteration, gameNumber, questionDate, diaPartida, showFeedback, tempAnswer, isTimeout, claveEstado])
 
     // Persiste el último estado con progreso justo antes de que la página se
     // oculte o se descargue (refresh, cierre, cambio de pestaña), cerrando la

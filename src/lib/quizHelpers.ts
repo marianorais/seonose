@@ -66,6 +66,15 @@ export const cargarEstadoGuardado = <T = unknown>(expectedDayKey?: string, clave
       if (expectedDayKey !== undefined && parsed.dayKey !== expectedDayKey) {
         return null
       }
+
+      // Partida de un día anterior guardada con la fecha de hoy (pestaña abierta
+      // al pasar la medianoche, defecto ya corregido en QuizPanel). Se delata
+      // porque su cuenta regresiva vencía antes de que empezara este día en
+      // Argentina. Se descarta para que pueda jugar la de hoy.
+      const proximo = Date.parse(String((parsed as { nextIteration?: unknown }).nextIteration ?? ''))
+      if (Number.isFinite(proximo) && proximo <= Date.parse(`${parsed.dayKey}T00:00:00-03:00`)) {
+        return null
+      }
     } else if (parsed.gameNumber !== undefined && parsed.gameNumber !== obtenerNumeroPartida()) {
       // Compatibilidad con estados guardados antes de incluir dayKey.
       return null

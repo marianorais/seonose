@@ -213,3 +213,61 @@ describe('desafío anterior', () => {
     expect(await screen.findByText(/ya lo habías jugado en este dispositivo/)).toBeTruthy()
   })
 })
+
+describe('pestaña abierta de un día para otro', () => {
+  const arbol = (questionDate: string) => (
+    <MemoryRouter>
+      <QuizPanel
+        questions={preguntas}
+        settings={{ questionsPerDay: 2, secondsPerQuestion: 30 }}
+        questionDate={questionDate}
+        allowReplay={false}
+      />
+    </MemoryRouter>
+  )
+
+  it('al cambiar el día no guarda la partida de ayer como si fuera la de hoy', async () => {
+    const { rerender, unmount } = render(arbol('2026-10-11'))
+    await jugar()
+    await screen.findByText('1 de 2 correctas')
+
+    // Pasa la medianoche con la pestaña abierta: App cambia la fecha.
+    rerender(arbol('2026-10-12'))
+    await act(async () => {})
+
+    const guardado = JSON.parse(window.localStorage.getItem('seonose-quiz-state') ?? 'null')
+    expect(guardado?.dayKey === '2026-10-12' && guardado?.finished).toBeFalsy()
+
+    // Al recargar la página ese día, la partida de hoy está disponible.
+    unmount()
+    render(arbol('2026-10-12'))
+    expect(screen.queryByText('1 de 2 correctas')).toBeNull()
+  })
+})
+
+describe('estado dañado por el defecto de la medianoche', () => {
+  it('se descarta y deja jugar la partida de hoy', () => {
+    // Lo que quedó guardado en dispositivos afectados: resultado de ayer con la
+    // fecha de hoy y la cuenta regresiva vencida a la medianoche.
+    window.localStorage.setItem(
+      'seonose-quiz-state',
+      JSON.stringify({
+        currentIndex: 1,
+        secondsLeft: 20,
+        answer: '',
+        answers: [{ questionId: 11, question: 'x', selected: 'París', correctAnswer: 'París', correct: true, responseTime: 3 }],
+        finished: true,
+        nextIteration: '2026-10-11T03:00:00.000Z',
+        gameNumber: 97,
+        dayKey: '2026-10-11',
+        showFeedback: false,
+        isTimeout: false,
+      })
+    )
+
+    renderizar()
+
+    expect(screen.queryByText(/correctas/)).toBeNull()
+    expect(screen.getByRole('button', { name: /¡JUGAR AHORA!/ })).toBeTruthy()
+  })
+})
